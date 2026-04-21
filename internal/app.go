@@ -537,18 +537,21 @@ func (m model) View() string {
 }
 
 func (m model) renderReadingContent() string {
-	title := ""
-	content := ""
-	pageNum := 0
-	totalPages := 0
-	totalChapters := 0
-	if m.pager != nil {
-		title = m.pager.CurrentTitle()
-		content = m.pager.CurrentContent()
-		pageNum = m.pager.Page()
-		totalPages = m.pager.TotalPages()
-		totalChapters = m.pager.TotalChapters()
+	if m.pager == nil {
+		hint := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6b7280")).
+			Render("No novel loaded. Type /novel to select a file.")
+		return m.theme.RenderPage(theme.PageInfo{
+			Content:   hint,
+			ThemeName: m.theme.Name(),
+			Version:   m.version,
+		}, m.width, m.height)
 	}
+	title := m.pager.CurrentTitle()
+	content := m.pager.CurrentContent()
+	pageNum := m.pager.Page()
+	totalPages := m.pager.TotalPages()
+	totalChapters := m.pager.TotalChapters()
 	return m.theme.RenderPage(theme.PageInfo{
 		ChapterTitle:  title,
 		Content:       content,

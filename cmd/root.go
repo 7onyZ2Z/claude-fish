@@ -20,53 +20,40 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "claude-fish <novel-file>",
+	Use:   "claude-fish",
 	Short: "A terminal novel reader disguised as a CLI coding tool",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.NoArgs,
 	Run:   run,
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&codeFile, "code", "c", "", "code file for boss mode")
+	rootCmd.Flags().StringVarP(&codeFile, "code", "c", "", "code file for boss mode (default: main.go)")
 	rootCmd.Flags().StringVarP(&themeName, "theme", "t", "claude", "theme: claude, codex, opencode")
 	rootCmd.Flags().IntVar(&speed, "speed", 25, "streaming speed in ms/char")
 }
 
 func run(cmd *cobra.Command, args []string) {
-	novelPath := args[0]
-
-	r := newReader(novelPath)
-	if r == nil {
-		fmt.Fprintf(os.Stderr, "Unsupported file format: %s\n", filepath.Ext(novelPath))
-		os.Exit(1)
-	}
-
-	if err := r.Load(novelPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading %s: %v\n", novelPath, err)
-		os.Exit(1)
-	}
-
-	var code, cfName string
-	if codeFile != "" {
-		data, err := os.ReadFile(codeFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error loading code file %s: %v\n", codeFile, err)
-			os.Exit(1)
-		}
-		code = string(data)
-		cfName = filepath.Base(codeFile)
-	}
-
 	th := theme.FindByName(themeName)
 
-	p := internal.NewApp(r, th, code, cfName, speed, filepath.Base(novelPath))
+	// Load code file for boss mode, default to main.go
+	var code, cfName string
+	cf := codeFile
+	if cf == "" {
+		cf = "main.go"
+	}
+	if data, err := os.ReadFile(cf); err == nil {
+		code = string(data)
+		cfName = filepath.Base(cf)
+	}
+
+	p := internal.NewApp(nil, th, code, cfName, speed, "")
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func newReader(path string) reader.Reader {
+func newReaderForPath(path string) reader.Reader {
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".txt":
@@ -75,9 +62,8 @@ func newReader(path string) reader.Reader {
 		return &reader.MarkdownReader{}
 	case ".epub":
 		return &reader.EPUBReader{}
-	default:
-		return nil
 	}
+	return nil
 }
 
 func Execute() {
