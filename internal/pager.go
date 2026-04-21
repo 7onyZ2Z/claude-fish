@@ -102,3 +102,12 @@ func (p *Pager) SetThemeLines(linesPerPage int) {
 	p.linesPerPage = linesPerPage
 	p.recalcAll()
 }
+
+func (p *Pager) GoToChapter(ch int) {
+	if ch >= 0 && ch < len(p.chapters) {
+		p.currentCh = ch
+		p.currentPg = 0
+	}
+}
+
+func (p *Pager) TotalChapters() int { return len(p.chapters) }
