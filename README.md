@@ -1,21 +1,52 @@
-# claude-fish
+<h1 align="center">claude-fish</h1>
 
-一个伪装成 CLI 编程工具的终端小说阅读器。
+<p align="center">
+  一个伪装成 CLI 编程工具的终端小说阅读器<br>
+  在终端里看小说，但看起来就像在用 Claude Code 写代码
+</p>
 
-![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)
-![License](https://img.shields.io/badge/License-MIT-green)
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go" alt="Go">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue" alt="Platform">
+</p>
 
-在终端里看小说，但看起来就像在写代码。支持一键切换到「老板模式」，瞬间显示一段带语法高亮的代码流式输出，完美通过领导检查。
+<p align="center">
+  <img src="picture/主页面.png" width="49%" alt="主页面">
+  <img src="picture/阅读页面.png" width="49%" alt="阅读页面">
+</p>
+
+按 `Tab` 一键切换到「老板模式」，瞬间显示带思考过程和代码的 AI 流式输出，完美防止领导 gank。
+
+<p align="center">
+  <img src="picture/老板模式.png" width="80%" alt="老板模式">
+</p>
 
 ## 功能特点
 
-- **三种 CLI 视觉风格** — Claude Code / Codex CLI / opencode，阅读时随时按键切换
-- **老板键保护** — 按 `Tab` 瞬间从小说切换到代码编辑界面，代码逐字流式输出，带语法高亮
-- **多种小说格式** — 支持 TXT、Markdown、EPUB，根据文件扩展名自动识别
-- **CJK 友好** — 中日韩字符按双宽度计算，不会出现截断乱码
-- **单二进制分发** — 编译后一个文件，零依赖，下载即用
+- **三种 CLI 视觉风格** — Claude Code / Codex CLI / opencode，运行中 `/theme` 随时切换
+- **老板键保护** — 按 `Tab` 切换到 AI 代码输出界面，自动循环播放
+- **多种小说格式** — 支持 TXT、Markdown、EPUB，自动识别编码（UTF-8 / GBK）
+- **智能章节识别** — 中文章节（第X章 / 分节阅读X）和英文章节（Chapter X）
+- **阅读历史** — 自动记住位置，下次打开可恢复或跳转章节
+- **斜杠命令** — `/novel` `/theme` `/chapters` 等，带自动补全
+- **CJK 友好** — 中日韩字符按双宽度计算，排版不截断不乱码
+- **单二进制分发** — 零依赖，下载即用，支持 macOS / Linux / Windows
 
 ## 安装
+
+### 直接下载
+
+前往 [Releases](https://github.com/tony/claude-fish/releases) 下载对应平台的压缩包，解压后即可运行。
+
+| 平台 | 文件 | 架构 |
+|------|------|------|
+| macOS | `claude-fish-v*-darwin-arm64.tar.gz` | Apple Silicon (M1/M2/M3/M4) |
+| macOS | `claude-fish-v*-darwin-amd64.tar.gz` | Intel |
+| Linux | `claude-fish-v*-linux-amd64.tar.gz` | x86_64 |
+| Linux | `claude-fish-v*-linux-arm64.tar.gz` | ARM64 |
+| Windows | `claude-fish-v*-windows-amd64.zip` | x86_64 |
+| Windows | `claude-fish-v*-windows-arm64.zip` | ARM64 |
 
 ### 从源码编译
 
@@ -27,139 +58,114 @@ cd claude-fish
 go build -o claude-fish .
 ```
 
-### 直接下载
-
-前往 [Releases](https://github.com/tony/claude-fish/releases) 页面下载对应平台的二进制文件。
-
 ## 使用方法
 
-### 基本用法
-
 ```bash
-# 阅读一本小说
-claude-fish novel.txt
-
-# 阅读小说，并指定一个代码文件作为老板键保护
-claude-fish novel.epub -c main.go
-
-# 使用 Codex CLI 风格
-claude-fish novel.txt -t codex
-
-# 使用 opencode 风格
-claude-fish novel.md -t opencode
-
-# 自定义流式输出速度（毫秒/字符）
-claude-fish novel.txt -c handler.go --speed 15
+./claude-fish
 ```
 
-### 命令行参数
+启动后进入 Claude Code 风格界面，输入 `/novel` 选择小说文件开始阅读。
 
-| 参数 | 缩写 | 说明 | 默认值 |
-|------|------|------|--------|
-| `--code` | `-c` | 代码文件路径，用于老板模式 | 无 |
-| `--theme` | `-t` | 视觉主题：`claude`、`codex`、`opencode` | `claude` |
-| `--speed` | | 流式输出速度（毫秒/字符） | `25` |
-| `--help` | `-h` | 显示帮助信息 | |
+### 交互操作
 
-### 快捷键
+**阅读模式：**
 
-| 按键 | 欢迎页 | 阅读模式 | 老板模式 |
-|------|--------|----------|----------|
-| `Space` / `Enter` | 开始阅读 | 下一页 | — |
-| `B` / `←` / `H` | — | 上一页 | — |
-| `S` | — | 切换主题风格 | — |
-| `Tab` | — | 进入老板模式 | 返回阅读 |
-| `Esc` | — | — | 返回阅读 |
-| `Q` / `Ctrl+C` | 退出 | 退出 | 退出 |
+| 按键 | 功能 |
+|:----:|------|
+| `Space` | 翻到下一页（输入框为空时生效） |
+| `Tab` | 切换到老板模式 |
+| `/` | 输入斜杠命令，弹出自动补全 |
+| `Esc` | 退出 |
+
+**老板模式：**
+
+| 按键 | 功能 |
+|:----:|------|
+| `Tab` | 返回阅读模式 |
+| `Esc` | 退出 |
+
+### 斜杠命令
+
+<p align="center">
+  <img src="picture/斜杠命令.png" width="60%" alt="斜杠命令">
+</p>
+
+| 命令 | 说明 |
+|------|------|
+| `/novel` | 选择小说文件 |
+| `/theme` | 切换视觉风格 |
+| `/chapters` | 跳转到指定章节 |
+| `/back` | 上一页 |
+| `/next` | 下一页 |
+
+## 功能展示
+
+### 小说选择
+
+输入 `/novel` 打开小说文件选择菜单。
+
+<p align="center">
+  <img src="picture/小说选择.png" width="60%" alt="小说选择">
+</p>
+
+### 阅读界面
+
+章节标题、小说内容、页码指示一目了然。
+
+<p align="center">
+  <img src="picture/阅读页面.png" width="80%" alt="阅读页面">
+</p>
+
+### 主题切换
+
+输入 `/theme` 在三种视觉风格间切换。
+
+<p align="center">
+  <img src="picture/主题选择.png" width="60%" alt="主题选择">
+</p>
+
+### 章节跳转
+
+输入 `/chapters` 打开章节列表，上下键选择后回车跳转。
+
+<p align="center">
+  <img src="picture/章节选择.png" width="60%" alt="章节选择">
+</p>
+
+### 老板模式
+
+按 `Tab` 瞬间切换到 AI 编程界面：
+
+1. **AI 思考过程** — 灰色文字显示分析过程
+2. **代码文件输出** — 带 `┌─ filename` 标签的代码块，逐字符流式显示
+3. **速度波动** — 模拟真实 AI 输出的随机停顿和加速
+4. **自动循环** — 输出完毕后自动从头开始
+
+<p align="center">
+  <img src="picture/老板模式.png" width="80%" alt="老板模式">
+</p>
+
+### 阅读历史
+
+自动将阅读位置保存到 `~/.claude-fish/history.json`。下次打开同一本小说时，可以选择：
+
+- **恢复上次位置** — 跳转到上次阅读的章节和页码
+- **从头开始** — 从第一页开始阅读
+- **跳转章节** — 打开章节列表选择
 
 ## 视觉风格
 
-### Claude Code（默认）
-
-紫色 (#7c3aed) 边框和强调色，橙色 (#f97316) ASCII Logo，对话气泡风格的内容展示，模拟 Claude Code 的完整界面布局。
-
-```
-╭─── claude-fish v1.0.0 ──────────────────────────────────────╮
-│                  Welcome!                  │ Loaded 三体.txt │
-│                      ▐▛███▜▌              │ 42 chapters     │
-│                     ▝▜█████▛▘              │ Press Space     │
-│                       ▘▘ ▝▝               │ Press Tab       │
-│   claude · v1.0.0                         │                 │
-╰────────────────────────────────────────────────────────────╯
-────────────────────────────────────────────────────────────
-❯
-```
-
-### Codex CLI
-
-绿色 (#10a37f) 强调色，极简风格，带有方块进度条显示阅读进度。
-
-```
-codex v1.0.0
-──────────────────────────────────────────────────────────
-Loaded: 三体.txt (42 chapters)
-
-Press Space to start reading
-```
-
-### opencode
-
-Catppuccin Mocha 配色方案，顶部 Tab 栏设计，柔和的蓝灰色调。
-
-```
-Welcome   Files   Config
-──────
- ╭──────────────────────────────────────────────────╮
- │ opencode                                          │
- │                                                   │
- │ Loaded: 三体.txt (42 chapters)                    │
- │ Press Space to start                               │
- ╰──────────────────────────────────────────────────╯
-```
-
-## 老板模式
-
-老板模式是 claude-fish 的核心功能。使用 `-c` 参数指定一个代码文件，当需要时按 `Tab` 键即可瞬间切换到代码编辑界面。
-
-### 工作原理
-
-1. **瞬间切换** — 按 `Tab` 立即从小说阅读界面切换到代码编辑界面，零延迟
-2. **流式输出** — 代码逐字符流式显示，带有随机速度抖动（±40%），模拟真实的 AI 编程工具输出
-3. **语法高亮** — 使用 Chroma 库根据文件扩展名自动识别语言并高亮显示
-4. **AI 前言** — 流式输出代码前会先显示一段「AI 思考」提示文本
-5. **循环播放** — 代码输出完毕后自动从头循环
-6. **断点续传** — 按 `Tab` 切回阅读模式时暂停，再次进入时从上次位置继续
-
-### 示例
-
-```bash
-# 准备一个看起来像在写的代码文件
-claude-fish 三体.txt -c src/api/handler.go
-
-# 阅读时按 Tab → 瞬间显示如下界面：
-╭────────────────────────────────────────────────────────────╮
-│ ● Editing handler.go │ claude-fish                        │
-╰────────────────────────────────────────────────────────────╯
-✦ Let me implement the changes in handler.go:
-┌─ handler.go
-package api
-
-import (
-    "net/http"
-    "encoding/json"
-)
-
-func HandleRequest(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodPost {
-        w.WriteHeader(http.StatusMethodNotAllowed)▌
-Writing to handler.go...
-```
+| 风格 | 说明 |
+|------|------|
+| **Claude Code**（默认） | 紫色边框，橙色 Logo，模拟 Claude Code v2.1.116 完整界面 |
+| **Codex CLI** | 绿色强调色，极简风格，方块进度条 |
+| **opencode** | Catppuccin Mocha 配色，顶部 Tab 栏，蓝灰色调 |
 
 ## 支持的小说格式
 
 | 格式 | 扩展名 | 说明 |
 |------|--------|------|
-| 纯文本 | `.txt` | 按空行分章节，以「第」或「Chapter」开头的行识别为章节标题 |
+| 纯文本 | `.txt` | 自动检测 UTF-8 / GBK 编码，识别中文和英文章节标题 |
 | Markdown | `.md` `.markdown` | 按 `#` / `##` 标题分章节 |
 | EPUB | `.epub` | 标准 EPUB 格式，自动解析 XHTML 内容和章节结构 |
 
@@ -169,26 +175,27 @@ Writing to handler.go...
 claude-fish/
 ├── main.go                    # 入口
 ├── cmd/
-│   └── root.go                # Cobra 命令定义和参数解析
+│   └── root.go                # CLI 命令定义
 ├── internal/
-│   ├── app.go                 # Bubble Tea 主模型，三态状态机
+│   ├── app.go                 # Bubble Tea 主模型
 │   ├── pager.go               # 分页引擎，CJK 双宽度感知
 │   ├── boss.go                # 老板模式状态管理
-│   ├── streamer.go            # 代码流式输出引擎
-│   ├── highlight.go           # Chroma 语法高亮
+│   ├── boss_content.go        # 内置 AI 输出模拟内容
+│   ├── streamer.go            # 多段流式输出引擎
+│   ├── history.go             # 阅读历史持久化
 │   ├── theme/
-│   │   ├── theme.go           # Theme 接口定义
+│   │   ├── theme.go           # Theme 接口
 │   │   ├── claudecode.go      # Claude Code 风格
 │   │   ├── codex.go           # Codex CLI 风格
 │   │   └── opencode.go        # opencode 风格
 │   └── reader/
-│       ├── reader.go          # Reader 接口定义
-│       ├── txt.go             # TXT 解析器
+│       ├── reader.go          # Reader 接口
+│       ├── txt.go             # TXT 解析器（GBK/UTF-8）
 │       ├── markdown.go        # Markdown 解析器
 │       └── epub.go            # EPUB 解析器
-└── testdata/
-    ├── sample.txt
-    └── sample.md
+├── novel/                     # 示例小说目录
+├── picture/                   # 截图
+└── build.sh                   # 跨平台构建脚本
 ```
 
 ## 技术栈
@@ -197,28 +204,18 @@ claude-fish/
 |----|------|
 | [Bubble Tea](https://github.com/charmbracelet/bubbletea) | TUI 框架 |
 | [Lip Gloss](https://github.com/charmbracelet/lipgloss) | 终端样式渲染 |
-| [Bubbles](https://github.com/charmbracelet/bubbles) | 预制组件 |
-| [Cobra](https://github.com/spf13/cobra) | CLI 命令和参数解析 |
-| [Chroma](https://github.com/alecthomas/chroma) | 代码语法高亮 |
+| [Bubbles](https://github.com/charmbracelet/bubbles) | 文本输入组件 |
+| [Cobra](https://github.com/spf13/cobra) | CLI 命令解析 |
+| [golang.org/x/text](https://pkg.go.dev/golang.org/x/text) | GBK 编码解码 |
 
-## 开发
+## 构建
 
 ```bash
-# 克隆仓库
-git clone https://github.com/tony/claude-fish.git
-cd claude-fish
-
-# 安装依赖
-go mod download
-
-# 运行测试
-go test ./...
-
-# 编译
+# 构建当前平台
 go build -o claude-fish .
 
-# 运行
-./claude-fish testdata/sample.txt -c main.go
+# 跨平台打包（生成 dist/ 目录下的 6 个压缩包）
+bash build.sh
 ```
 
 ## License
