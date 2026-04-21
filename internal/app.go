@@ -17,18 +17,20 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// ── States ───────────────────────────────────────────────────────
+
 type appState int
 
 const (
 	stateReading appState = iota
 	stateBoss
-	stateMenu
 )
 
 type menuKind int
 
 const (
-	menuNovel menuKind = iota
+	menuNone menuKind = iota
+	menuNovel
 	menuTheme
 	menuChapter
 )
@@ -39,11 +41,28 @@ type menuItem struct {
 }
 
 type menuState struct {
-	active   bool
 	kind     menuKind
 	items    []menuItem
 	selected int
 }
+
+// ── Command registry ─────────────────────────────────────────────
+
+type command struct {
+	name string
+	desc string
+}
+
+var allCommands = []command{
+	{"/novel", "Switch novel file"},
+	{"/theme", "Switch theme style"},
+	{"/chapters", "Jump to chapter"},
+	{"/back", "Previous page"},
+	{"/next", "Next page"},
+	{"/help", "Show available commands"},
+}
+
+// ── Model ────────────────────────────────────────────────────────
 
 type model struct {
 	state      appState
@@ -60,6 +79,7 @@ type model struct {
 	input      textinput.Model
 	menu       menuState
 	novelDir   string
+	messages   []string // command output lines shown between content and input
 }
 
 func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, speed int) model {
@@ -87,7 +107,7 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 
 	ti := textinput.New()
 	ti.Prompt = "❯ "
-	ti.Placeholder = "Type a message... or /help"
+	ti.Placeholder = "Type a message... or type / for commands"
 	ti.CharLimit = 500
 	ti.Width = width - 4
 
@@ -138,46 +158,64 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		key := msg.String()
 
-		// Menu navigation
-		if m.state == stateMenu {
+		// If a submenu is active (novel/theme/chapter picker), handle it
+		if m.menu.kind != menuNone {
 			return m.handleMenuKey(key)
 		}
 
-		// Direct shortcuts that don't conflict with typing
-		switch key {
-		case " ":
-			if m.state == stateReading && m.pager != nil {
-				m.pager.NextPage()
-			}
-			return m, nil
-		case "tab":
-			if m.state == stateReading && m.boss.HasCode() {
-				m.state = stateBoss
-				m.boss.Activate()
-				s := m.boss.Streamer()
-				if !s.Done() {
-					return m, tea.Tick(time.Duration(s.JitterSpeed())*time.Millisecond,
-						func(t time.Time) tea.Msg { return tickMsg(t) })
-				}
-			} else if m.state == stateBoss {
-				m.state = stateReading
-				m.boss.Deactivate()
-			}
-			return m, nil
-		case "esc":
+		// Tab: boss mode toggle (always a shortcut)
+		if key == "tab" {
+			return m.handleTab()
+		}
+		// Esc: in boss mode go back, otherwise quit
+		if key == "esc" {
 			if m.state == stateBoss {
 				m.state = stateReading
 				m.boss.Deactivate()
 				return m, nil
 			}
 			return m, tea.Quit
-		case "enter":
+		}
+
+		// Enter: process command or show output
+		if key == "enter" {
 			return m.handleEnter()
 		}
 
-		// Everything else goes to text input
+		// Space: page next only when input is empty
+		if key == " " {
+			if strings.TrimSpace(m.input.Value()) == "" {
+				if m.state == stateReading && m.pager != nil {
+					m.pager.NextPage()
+				}
+				return m, nil
+			}
+			// Input has content → space goes to input as normal char
+		}
+
+		// Up/down: if command autocomplete is showing, navigate it
+		input := m.input.Value()
+		if strings.HasPrefix(input, "/") {
+			filtered := filterCommands(input)
+			if key == "up" && len(filtered) > 0 {
+				if m.menu.selected > 0 {
+					m.menu.selected--
+				}
+				return m, nil
+			}
+			if key == "down" && len(filtered) > 0 {
+				if m.menu.selected < len(filtered)-1 {
+					m.menu.selected++
+				}
+				return m, nil
+			}
+		}
+
+		// All other keys go to text input
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
+		// Reset autocomplete selection when input changes
+		m.menu = menuState{}
 		return m, cmd
 
 	case tickMsg:
@@ -195,13 +233,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// ── Enter: process command or clear ──────────────────────────────
+// ── Tab ──────────────────────────────────────────────────────────
+
+func (m model) handleTab() (tea.Model, tea.Cmd) {
+	if m.state == stateReading && m.boss.HasCode() {
+		m.state = stateBoss
+		m.boss.Activate()
+		s := m.boss.Streamer()
+		if !s.Done() {
+			return m, tea.Tick(time.Duration(s.JitterSpeed())*time.Millisecond,
+				func(t time.Time) tea.Msg { return tickMsg(t) })
+		}
+	} else if m.state == stateBoss {
+		m.state = stateReading
+		m.boss.Deactivate()
+	}
+	return m, nil
+}
+
+// ── Enter: command processing ────────────────────────────────────
 
 func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	input := strings.TrimSpace(m.input.Value())
 	m.input.SetValue("")
 
+	if input == "" {
+		return m, nil
+	}
+
+	// If autocomplete is showing and something is selected, use that
+	if strings.HasPrefix(input, "/") && m.menu.selected >= 0 {
+		filtered := filterCommands(input)
+		if m.menu.selected < len(filtered) {
+			input = filtered[m.menu.selected].name
+		}
+	}
+	m.menu = menuState{}
+
 	if !strings.HasPrefix(input, "/") {
+		// Not a command → show as user message, no action
+		m.addMessage(input)
 		return m, nil
 	}
 
@@ -214,63 +285,77 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 
 	switch cmd {
 	case "/novel":
-		return m.openNovelMenu()
+		return m.cmdNovel()
 	case "/theme":
-		return m.openThemeMenu()
+		return m.cmdTheme()
 	case "/chapters":
-		if arg != "" {
-			n, err := strconv.Atoi(arg)
-			if err == nil && m.pager != nil {
-				chapters := m.pager.Chapters()
-				if n >= 1 && n <= len(chapters) {
-					m.pager.GoToChapter(n - 1)
-				}
-			}
-			return m, nil
-		}
-		return m.openChapterMenu()
-	case "/back", "/b":
+		return m.cmdChapters(arg)
+	case "/back":
 		if m.pager != nil {
 			m.pager.PrevPage()
 		}
-		return m, nil
-	case "/next", "/n":
+		m.addMessage("went back one page")
+	case "/next":
 		if m.pager != nil {
 			m.pager.NextPage()
 		}
-		return m, nil
+		m.addMessage("went to next page")
 	case "/help":
-		m.input.SetValue("/novel  /theme  /chapters [N]  /back  /next  /help")
-		return m, nil
+		var lines []string
+		for _, c := range allCommands {
+			lines = append(lines, fmt.Sprintf("  %-12s %s", c.name, c.desc))
+		}
+		m.addMessage(strings.Join(lines, "\n"))
+	default:
+		m.addMessage(fmt.Sprintf("unknown command: %s", cmd))
 	}
 
 	return m, nil
 }
 
-// ── Menu opening ─────────────────────────────────────────────────
+func (m *model) addMessage(msg string) {
+	m.messages = append(m.messages, msg)
+	// Keep only last 6 messages to avoid overflowing the screen
+	if len(m.messages) > 6 {
+		m.messages = m.messages[len(m.messages)-6:]
+	}
+}
 
-func (m model) openNovelMenu() (tea.Model, tea.Cmd) {
+// ── Command implementations ──────────────────────────────────────
+
+func (m model) cmdNovel() (tea.Model, tea.Cmd) {
 	items := scanNovelDir(m.novelDir)
 	if len(items) == 0 {
-		m.input.SetValue("No novels found in ./" + m.novelDir + "/")
+		m.addMessage(fmt.Sprintf("No novels found in ./%s/", m.novelDir))
 		return m, nil
 	}
-	m.state = stateMenu
-	m.menu = menuState{active: true, kind: menuNovel, items: items, selected: 0}
+	m.menu = menuState{kind: menuNovel, items: items, selected: 0}
 	return m, nil
 }
 
-func (m model) openThemeMenu() (tea.Model, tea.Cmd) {
+func (m model) cmdTheme() (tea.Model, tea.Cmd) {
 	var items []menuItem
 	for _, t := range m.themes {
 		items = append(items, menuItem{label: t.Name(), value: t.Name()})
 	}
-	m.state = stateMenu
-	m.menu = menuState{active: true, kind: menuTheme, items: items, selected: m.themeIndex}
+	m.menu = menuState{kind: menuTheme, items: items, selected: m.themeIndex}
 	return m, nil
 }
 
-func (m model) openChapterMenu() (tea.Model, tea.Cmd) {
+func (m model) cmdChapters(arg string) (tea.Model, tea.Cmd) {
+	if arg != "" {
+		n, err := strconv.Atoi(arg)
+		if err == nil && m.pager != nil {
+			chapters := m.pager.Chapters()
+			if n >= 1 && n <= len(chapters) {
+				m.pager.GoToChapter(n - 1)
+				m.addMessage(fmt.Sprintf("jumped to chapter %d: %s", n, chapters[n-1].Title))
+			} else {
+				m.addMessage(fmt.Sprintf("invalid chapter: %d (1-%d)", n, len(chapters)))
+			}
+		}
+		return m, nil
+	}
 	if m.pager == nil {
 		return m, nil
 	}
@@ -282,8 +367,7 @@ func (m model) openChapterMenu() (tea.Model, tea.Cmd) {
 			value: strconv.Itoa(i),
 		})
 	}
-	m.state = stateMenu
-	m.menu = menuState{active: true, kind: menuChapter, items: items, selected: m.pager.Chapter()}
+	m.menu = menuState{kind: menuChapter, items: items, selected: m.pager.Chapter()}
 	return m, nil
 }
 
@@ -302,7 +386,6 @@ func (m model) handleMenuKey(key string) (tea.Model, tea.Cmd) {
 	case "enter":
 		return m.confirmMenuSelection()
 	case "esc":
-		m.state = stateReading
 		m.menu = menuState{}
 	}
 	return m, nil
@@ -310,7 +393,6 @@ func (m model) handleMenuKey(key string) (tea.Model, tea.Cmd) {
 
 func (m model) confirmMenuSelection() (tea.Model, tea.Cmd) {
 	if m.menu.selected < 0 || m.menu.selected >= len(m.menu.items) {
-		m.state = stateReading
 		m.menu = menuState{}
 		return m, nil
 	}
@@ -329,6 +411,7 @@ func (m model) confirmMenuSelection() (tea.Model, tea.Cmd) {
 				}
 				m.pager = NewPager(r, m.width-4, usable)
 				m.fileName = filepath.Base(path)
+				m.addMessage(fmt.Sprintf("loaded: %s", filepath.Base(path)))
 			}
 		}
 	case menuTheme:
@@ -343,22 +426,36 @@ func (m model) confirmMenuSelection() (tea.Model, tea.Cmd) {
 					}
 					m.pager.SetThemeLines(usable)
 				}
+				m.addMessage(fmt.Sprintf("switched to theme: %s", t.Name()))
 				break
 			}
 		}
 	case menuChapter:
 		ch, _ := strconv.Atoi(item.value)
 		if m.pager != nil {
+			title := m.pager.Chapters()[ch].Title
 			m.pager.GoToChapter(ch)
+			m.addMessage(fmt.Sprintf("jumped to: %s", title))
 		}
 	}
 
-	m.state = stateReading
 	m.menu = menuState{}
 	return m, nil
 }
 
-// ── Helpers ──────────────────────────────────────────────────────
+// ── Command autocomplete ─────────────────────────────────────────
+
+func filterCommands(input string) []command {
+	var filtered []command
+	for _, c := range allCommands {
+		if strings.HasPrefix(c.name, input) {
+			filtered = append(filtered, c)
+		}
+	}
+	return filtered
+}
+
+// ── File helpers ─────────────────────────────────────────────────
 
 func scanNovelDir(dir string) []menuItem {
 	entries, err := os.ReadDir(dir)
@@ -375,8 +472,8 @@ func scanNovelDir(dir string) []menuItem {
 		}
 		ext := strings.ToLower(filepath.Ext(e.Name()))
 		if supported[ext] {
-		 fullPath := filepath.Join(dir, e.Name())
-		 items = append(items, menuItem{
+			fullPath := filepath.Join(dir, e.Name())
+			items = append(items, menuItem{
 				label: e.Name(),
 				value: fullPath,
 			})
@@ -407,31 +504,32 @@ func newReaderForFile(path string) reader.Reader {
 func (m model) View() string {
 	inputView := m.input.View()
 
+	// 1. Content area
+	var content string
 	switch m.state {
-	case stateMenu:
-		// Show content behind the menu (dimmed)
-		content := m.renderReadingContent()
-		menuView := m.renderMenu()
-		return content + "\n" + menuView + "\n" + inputView + "\n" + renderSeparator(m.width)
-
 	case stateReading:
-		return m.renderReadingContent() + "\n" + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width)
-
+		content = m.renderReadingContent()
 	case stateBoss:
 		s := m.boss.Streamer()
 		visible := s.VisibleContent()
 		highlighted := HighlightCode(visible, s.FileName())
-		return m.theme.RenderCode(theme.CodeInfo{
+		content = m.theme.RenderCode(theme.CodeInfo{
 			FileName:  s.FileName(),
 			Content:   highlighted,
 			Displayed: s.Displayed(),
 			Total:     s.Total(),
 			ThemeName: m.theme.Name(),
 			Version:   m.version,
-		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width)
+		}, m.width, m.height)
 	}
 
-	return ""
+	// 2. Message area (command output between content and input)
+	msgView := m.renderMessages()
+
+	// 3. Autocomplete popup or submenu
+	popupView := m.renderPopup()
+
+	return content + msgView + popupView + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width)
 }
 
 func (m model) renderReadingContent() string {
@@ -459,6 +557,57 @@ func (m model) renderReadingContent() string {
 	}, m.width, m.height)
 }
 
+func (m model) renderMessages() string {
+	if len(m.messages) == 0 {
+		return ""
+	}
+	grayStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6b7280"))
+	var b strings.Builder
+	for _, msg := range m.messages {
+		b.WriteString(grayStyle.Render("  " + msg))
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+func (m model) renderPopup() string {
+	// Submenu picker (novel/theme/chapter)
+	if m.menu.kind != menuNone {
+		return m.renderMenu()
+	}
+
+	// Autocomplete: show filtered commands when input starts with /
+	input := m.input.Value()
+	if !strings.HasPrefix(input, "/") {
+		return ""
+	}
+	filtered := filterCommands(input)
+	if len(filtered) == 0 {
+		return ""
+	}
+
+	accentColor := m.theme.AccentColor()
+	selectedStyle := lipgloss.NewStyle().Foreground(accentColor).Bold(true)
+	normalStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#d1d5db"))
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6b7280"))
+	grayStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6b7280"))
+
+	var b strings.Builder
+	for i, cmd := range filtered {
+		if i == m.menu.selected {
+			b.WriteString(selectedStyle.Render(fmt.Sprintf("  > %-12s", cmd.name)))
+			b.WriteString(descStyle.Render(cmd.desc))
+		} else {
+			b.WriteString(normalStyle.Render(fmt.Sprintf("    %-12s", cmd.name)))
+			b.WriteString(descStyle.Render(cmd.desc))
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString(grayStyle.Render("  ↑↓ navigate · Enter select"))
+	b.WriteString("\n")
+	return b.String()
+}
+
 func (m model) renderMenu() string {
 	if len(m.menu.items) == 0 {
 		return ""
@@ -466,7 +615,6 @@ func (m model) renderMenu() string {
 
 	var b strings.Builder
 
-	// Menu title
 	titles := map[menuKind]string{menuNovel: "Novels", menuTheme: "Themes", menuChapter: "Chapters"}
 	accentColor := m.theme.AccentColor()
 	titleStyle := lipgloss.NewStyle().Foreground(accentColor).Bold(true)
@@ -481,7 +629,6 @@ func (m model) renderMenu() string {
 	b.WriteString(borderStyle.Render("  ┌" + strings.Repeat("─", 40) + "┐"))
 	b.WriteString("\n")
 
-	// Show at most 8 items, windowed around selected
 	maxVisible := 8
 	start := 0
 	if m.menu.selected >= maxVisible {
@@ -494,10 +641,14 @@ func (m model) renderMenu() string {
 
 	for i := start; i < end; i++ {
 		item := m.menu.items[i]
+		padLen := 39 - len(item.label)
+		if padLen < 0 {
+			padLen = 0
+		}
 		if i == m.menu.selected {
-			b.WriteString(borderStyle.Render("  │") + selectedStyle.Render(fmt.Sprintf(" ● %s", item.label)) + strings.Repeat(" ", max(0, 39-len(item.label))) + borderStyle.Render("│"))
+			b.WriteString(borderStyle.Render("  │") + selectedStyle.Render(fmt.Sprintf(" ● %s", item.label)) + strings.Repeat(" ", padLen) + borderStyle.Render("│"))
 		} else {
-			b.WriteString(borderStyle.Render("  │") + normalStyle.Render(fmt.Sprintf("   %s", item.label)) + strings.Repeat(" ", max(0, 39-len(item.label))) + borderStyle.Render("│"))
+			b.WriteString(borderStyle.Render("  │") + normalStyle.Render(fmt.Sprintf("   %s", item.label)) + strings.Repeat(" ", padLen) + borderStyle.Render("│"))
 		}
 		b.WriteString("\n")
 	}
