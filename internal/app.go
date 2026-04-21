@@ -8,6 +8,7 @@ import (
 	"claude-fish/internal/theme"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -30,6 +31,7 @@ type model struct {
 	speed      int
 	fileName   string
 	version    string
+	input      textinput.Model
 }
 
 // newModel creates the internal model. Used by NewApp and tests.
@@ -56,6 +58,12 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 		boss = NewBossMode("", "", speed)
 	}
 
+	ti := textinput.New()
+	ti.Prompt = "❯ "
+	ti.Placeholder = "Type a message..."
+	ti.CharLimit = 500
+	ti.Width = width - 4
+
 	return model{
 		state:      stateReading,
 		theme:      th,
@@ -67,6 +75,7 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 		height:     height,
 		speed:      speed,
 		version:    "v1.0.0",
+		input:      ti,
 	}
 }
 
@@ -74,18 +83,32 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 func NewApp(r reader.Reader, th theme.Theme, code, codeFile string, speed int, fileName string) *tea.Program {
 	m := newModel(r, th, NewBossMode(code, codeFile, speed), 80, 24, speed)
 	m.fileName = fileName
+	m.input.Focus()
 	return tea.NewProgram(m, tea.WithAltScreen())
 }
 
-func (model) Init() tea.Cmd { return nil }
+func (model) Init() tea.Cmd { return textinput.Blink }
 
 type tickMsg time.Time
+
+// isShortcutKey returns true if the key should be handled as a shortcut
+// rather than passed to the text input.
+func isShortcutKey(key string) bool {
+	switch key {
+	case " ", "b", "h", "l", "s", "tab", "esc",
+		"left", "right", "up", "down",
+		"q", "ctrl+c", "enter":
+		return true
+	}
+	return false
+}
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.input.Width = msg.Width - 4
 		if m.pager != nil {
 			usable := m.theme.UsableHeight(msg.Height)
 			if usable < 1 {
@@ -96,7 +119,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		return m.handleKey(msg.String())
+		key := msg.String()
+
+		// Shortcuts take priority
+		if isShortcutKey(key) {
+			// Enter clears the input (simulates sending)
+			if key == "enter" {
+				m.input.SetValue("")
+				return m, nil
+			}
+			return m.handleKey(key)
+		}
+
+		// All other keys go to the text input
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		return m, cmd
 
 	case tickMsg:
 		if m.state == stateBoss && m.boss.HasCode() {
@@ -162,6 +200,8 @@ func (m model) handleKey(key string) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	inputView := m.input.View()
+
 	switch m.state {
 	case stateReading:
 		title := ""
@@ -185,7 +225,7 @@ func (m model) View() string {
 			TotalChapters: totalChapters,
 			ThemeName:     m.theme.Name(),
 			Version:       m.version,
-		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n❯ \n" + renderSeparator(m.width)
+		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width)
 
 	case stateBoss:
 		s := m.boss.Streamer()
@@ -198,7 +238,7 @@ func (m model) View() string {
 			Total:     s.Total(),
 			ThemeName: m.theme.Name(),
 			Version:   m.version,
-		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n❯ \n" + renderSeparator(m.width)
+		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width)
 	}
 
 	return ""
