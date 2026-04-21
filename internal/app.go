@@ -104,7 +104,7 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 	}
 
 	if boss == nil {
-		boss = NewBossMode("", "", speed)
+		boss = NewBossMode(defaultBossContent, speed)
 	}
 
 	ti := textinput.New()
@@ -130,9 +130,9 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 	}
 }
 
-func NewApp(r reader.Reader, th theme.Theme, code, codeFile string, speed int, fileName string) *tea.Program {
-	m := newModel(r, th, NewBossMode(code, codeFile, speed), 80, 24, speed)
-	m.fileName = fileName
+func NewApp(r reader.Reader, th theme.Theme, segments []Segment, fn string, speed int) *tea.Program {
+	m := newModel(r, th, NewBossMode(segments, speed), 80, 24, speed)
+	m.fileName = fn
 	m.input.Focus()
 	return tea.NewProgram(m, tea.WithAltScreen())
 }
@@ -226,11 +226,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		if m.state == stateBoss && m.boss.HasCode() {
 			s := m.boss.Streamer()
-			if !s.Done() {
-				s.Advance(1)
-				return m, tea.Tick(time.Duration(s.JitterSpeed())*time.Millisecond,
-					func(t time.Time) tea.Msg { return tickMsg(t) })
+			if s.Done() {
+				s.Reset()
 			}
+			s.Advance(s.ChunkSize())
+			return m, tea.Tick(time.Duration(s.JitterSpeed())*time.Millisecond,
+				func(t time.Time) tea.Msg { return tickMsg(t) })
 		}
 		return m, nil
 	}
@@ -244,11 +245,8 @@ func (m model) handleTab() (tea.Model, tea.Cmd) {
 	if m.state == stateReading && m.boss.HasCode() {
 		m.state = stateBoss
 		m.boss.Activate()
-		s := m.boss.Streamer()
-		if !s.Done() {
-			return m, tea.Tick(time.Duration(s.JitterSpeed())*time.Millisecond,
-				func(t time.Time) tea.Msg { return tickMsg(t) })
-		}
+		return m, tea.Tick(time.Duration(m.boss.Streamer().JitterSpeed())*time.Millisecond,
+			func(t time.Time) tea.Msg { return tickMsg(t) })
 	} else if m.state == stateBoss {
 		m.state = stateReading
 		m.boss.Deactivate()
@@ -556,10 +554,9 @@ func (m model) View() string {
 	case stateBoss:
 		s := m.boss.Streamer()
 		visible := s.VisibleContent()
-		highlighted := HighlightCode(visible, s.FileName())
 		content = m.theme.RenderCode(theme.CodeInfo{
-			FileName:  s.FileName(),
-			Content:   highlighted,
+			FileName:  "main.go",
+			Content:   visible,
 			Displayed: s.Displayed(),
 			Total:     s.Total(),
 			ThemeName: m.theme.Name(),

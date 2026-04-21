@@ -62,9 +62,50 @@ func (s *Streamer) Reset() {
 
 func (s *Streamer) Speed() int { return s.speed }
 
+// ChunkSize returns a variable number of characters to advance per tick.
+func (s *Streamer) ChunkSize() int {
+	seg := s.CurrentSegmentType()
+	switch seg {
+	case SegmentThink:
+		n := 3 + rand.Intn(8)
+		if rand.Float64() < 0.15 {
+			n += rand.Intn(12)
+		}
+		return n
+	case SegmentText:
+		n := 2 + rand.Intn(5)
+		if rand.Float64() < 0.1 {
+			n = 1
+		}
+		return n
+	case SegmentCode:
+		n := 2 + rand.Intn(4)
+		if rand.Float64() < 0.25 {
+			n += rand.Intn(6)
+		}
+		return n
+	}
+	return 3
+}
+
+// JitterSpeed returns tick interval with segment-aware variation.
 func (s *Streamer) JitterSpeed() int {
-	jitter := float64(s.speed) * 0.4
-	return s.speed + int(rand.Float64()*jitter*2-jitter)
+	seg := s.CurrentSegmentType()
+	switch seg {
+	case SegmentThink:
+		return 8 + rand.Intn(10)
+	case SegmentText:
+		if rand.Float64() < 0.08 {
+			return 60 + rand.Intn(60)
+		}
+		return 12 + rand.Intn(18)
+	case SegmentCode:
+		if rand.Float64() < 0.05 {
+			return 50 + rand.Intn(40)
+		}
+		return 10 + rand.Intn(12)
+	}
+	return 15
 }
 
 // VisibleContent returns the full rendered output up to current position.
