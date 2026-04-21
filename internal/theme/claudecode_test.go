@@ -55,8 +55,11 @@ func TestClaudeCodeRenderCode(t *testing.T) {
 	}
 	output := th.RenderCode(info, 80, 24)
 
-	if !strings.Contains(output, "main.go") {
-		t.Error("RenderCode output missing filename")
+	if !strings.Contains(output, "Claude Code") {
+		t.Error("RenderCode output missing Claude Code branding")
+	}
+	if !strings.Contains(output, "package main") {
+		t.Error("RenderCode output missing content")
 	}
 	if !strings.Contains(output, "Claude Code") {
 		t.Error("RenderCode output missing Claude Code branding")

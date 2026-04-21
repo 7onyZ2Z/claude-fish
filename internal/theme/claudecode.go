@@ -151,41 +151,16 @@ func (claudeCodeTheme) RenderCode(info CodeInfo, width, height int) string {
 	// Shared header
 	b.WriteString(renderClaudeHeader(info.Version, info.FileName, info.ThemeName, 0, width))
 
-	// Code header bar
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(claudePurple)).
-		Border(lipgloss.RoundedBorder(), true, false, true, false).
-		BorderForeground(lipgloss.Color(claudePurple)).
-		Width(width - 2)
-
-	headerText := fmt.Sprintf(" ● Editing │ %s │ claude-fish", info.FileName)
-	b.WriteString(headerStyle.Render(headerText))
-	b.WriteString("\n")
-
-	// AI preamble
-	preambleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(claudeLightPurple))
-	b.WriteString("✦ ")
-	b.WriteString(preambleStyle.Render(fmt.Sprintf("Let me implement the changes in %s:", info.FileName)))
-	b.WriteString("\n")
-
-	// Code block
-	if info.Displayed > 0 {
-		codeContent := info.Content
-		if info.Displayed < len(info.Content) {
-			codeContent = info.Content[:info.Displayed]
+	// Content — already formatted with think/text/code segments by streamer
+	if info.Content != "" {
+		b.WriteString(info.Content)
+		if !strings.HasSuffix(info.Content, "\n") {
+			b.WriteString("\n")
 		}
-
-		codeStyle := lipgloss.NewStyle().Width(width - 4)
-		fileLabel := lipgloss.NewStyle().Foreground(lipgloss.Color(claudeGray)).Render(
-			fmt.Sprintf("┌─ %s", info.FileName))
-		b.WriteString(fileLabel)
-		b.WriteString("\n")
-		b.WriteString(codeStyle.Render(codeContent))
-
 		if info.Displayed < info.Total {
 			b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(claudePurple)).Render("▌"))
+			b.WriteString("\n")
 		}
-		b.WriteString("\n")
 	}
 
 	return b.String()

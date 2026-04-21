@@ -6,10 +6,10 @@ type BossMode struct {
 	hasCode  bool
 }
 
-func NewBossMode(code, fileName string, speed int) *BossMode {
+func NewBossMode(segments []Segment, speed int) *BossMode {
 	return &BossMode{
-		streamer: NewStreamer(code, fileName, speed),
-		hasCode:  code != "",
+		streamer: NewStreamer(segments, speed),
+		hasCode:  len(segments) > 0,
 	}
 }
 

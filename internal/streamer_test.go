@@ -6,10 +6,8 @@ import (
 )
 
 func TestStreamerVisibleContent(t *testing.T) {
-	s := NewStreamer("package main\n\nfunc main() {}\n", "main.go", 25)
-	if s.FileName() != "main.go" {
-		t.Errorf("FileName() = %q, want %q", s.FileName(), "main.go")
-	}
+	segs := []Segment{TextSegment("package main\n\nfunc main() {}\n")}
+	s := NewStreamer(segs, 25)
 
 	s.Advance(5)
 	if s.Displayed() != 5 {
@@ -23,8 +21,8 @@ func TestStreamerVisibleContent(t *testing.T) {
 }
 
 func TestStreamerLoop(t *testing.T) {
-	code := "abc"
-	s := NewStreamer(code, "test.go", 25)
+	segs := []Segment{TextSegment("abc")}
+	s := NewStreamer(segs, 25)
 
 	s.Advance(10)
 	if !s.Done() {
@@ -37,13 +35,22 @@ func TestStreamerLoop(t *testing.T) {
 	}
 }
 
-func TestStreamerPreamble(t *testing.T) {
-	s := NewStreamer("code", "handler.go", 25)
-	preamble := s.Preamble()
-	if preamble == "" {
-		t.Error("Preamble() returned empty string")
+func TestStreamerMultiSegment(t *testing.T) {
+	segs := []Segment{
+		ThinkSegment("thinking..."),
+		TextSegment("done"),
 	}
-	if !strings.Contains(preamble, "handler.go") {
-		t.Errorf("Preamble() = %q, should contain filename", preamble)
+	s := NewStreamer(segs, 25)
+
+	s.Advance(5)
+	vis := s.VisibleContent()
+	if !strings.Contains(vis, "think") {
+		t.Errorf("VisibleContent() = %q, should contain 'think'", vis)
+	}
+
+	s.Advance(100)
+	vis = s.VisibleContent()
+	if !strings.Contains(vis, "done") {
+		t.Errorf("VisibleContent() = %q, should contain 'done'", vis)
 	}
 }

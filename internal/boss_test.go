@@ -3,24 +3,24 @@ package internal
 import "testing"
 
 func TestBossModeInit(t *testing.T) {
-	b := NewBossMode("package main\n", "main.go", 25)
+	b := NewBossMode([]Segment{CodeSegment("main.go", "package main\n")}, 25)
 	if b.Active() {
 		t.Error("new BossMode should not be active")
 	}
 	if !b.HasCode() {
-		t.Error("HasCode() should be true when code is loaded")
+		t.Error("HasCode() should be true when segments loaded")
 	}
 }
 
 func TestBossModeNoCode(t *testing.T) {
-	b := NewBossMode("", "", 25)
+	b := NewBossMode(nil, 25)
 	if b.HasCode() {
-		t.Error("HasCode() should be false when no code")
+		t.Error("HasCode() should be false when no segments")
 	}
 }
 
 func TestBossModeActivateDeactivate(t *testing.T) {
-	b := NewBossMode("code", "test.go", 25)
+	b := NewBossMode([]Segment{TextSegment("hello world")}, 25)
 
 	b.Activate()
 	if !b.Active() {
@@ -30,8 +30,8 @@ func TestBossModeActivateDeactivate(t *testing.T) {
 		t.Error("streamer should start at 0")
 	}
 
-	b.Streamer().Advance(2)
-	if b.Streamer().Displayed() != 2 {
+	b.Streamer().Advance(5)
+	if b.Streamer().Displayed() != 5 {
 		t.Errorf("streamer should have advanced, got %d", b.Streamer().Displayed())
 	}
 
@@ -41,8 +41,8 @@ func TestBossModeActivateDeactivate(t *testing.T) {
 	}
 
 	b.Activate()
-	if b.Streamer().Displayed() != 2 {
-		t.Errorf("streamer should resume from 2, got %d", b.Streamer().Displayed())
+	if b.Streamer().Displayed() != 5 {
+		t.Errorf("streamer should resume from 5, got %d", b.Streamer().Displayed())
 	}
 
 	b.Streamer().Advance(100)
