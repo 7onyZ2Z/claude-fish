@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"claude-fish/internal/reader"
 	"claude-fish/internal/theme"
@@ -80,7 +79,6 @@ type model struct {
 	input      textinput.Model
 	menu       menuState
 	novelDir   string
-	messages   []string // command output lines shown between content and input
 	history    *HistoryStore
 	resumePath string // pending novel path awaiting resume choice
 }
@@ -276,7 +274,6 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 
 	if !strings.HasPrefix(input, "/") {
 		// Not a command → show as user message, no action
-		m.addMessage(input)
 		return m, nil
 	}
 
@@ -298,31 +295,19 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 		if m.pager != nil {
 			m.pager.PrevPage()
 		}
-		m.addMessage("went back one page")
 	case "/next":
 		if m.pager != nil {
 			m.pager.NextPage()
 		}
-		m.addMessage("went to next page")
 	case "/help":
 		var lines []string
 		for _, c := range allCommands {
 			lines = append(lines, fmt.Sprintf("  %-12s %s", c.name, c.desc))
 		}
-		m.addMessage(strings.Join(lines, "\n"))
 	default:
-		m.addMessage(fmt.Sprintf("unknown command: %s", cmd))
 	}
 
 	return m, nil
-}
-
-func (m *model) addMessage(msg string) {
-	m.messages = append(m.messages, msg)
-	// Keep only last 6 messages to avoid overflowing the screen
-	if len(m.messages) > 6 {
-		m.messages = m.messages[len(m.messages)-6:]
-	}
 }
 
 // ── Command implementations ──────────────────────────────────────
@@ -330,7 +315,6 @@ func (m *model) addMessage(msg string) {
 func (m model) cmdNovel() (tea.Model, tea.Cmd) {
 	items := scanNovelDir(m.novelDir)
 	if len(items) == 0 {
-		m.addMessage(fmt.Sprintf("No novels found in ./%s/", m.novelDir))
 		return m, nil
 	}
 	m.menu = menuState{kind: menuNovel, items: items, selected: 0}
@@ -353,9 +337,7 @@ func (m model) cmdChapters(arg string) (tea.Model, tea.Cmd) {
 			chapters := m.pager.Chapters()
 			if n >= 1 && n <= len(chapters) {
 				m.pager.GoToChapter(n - 1)
-				m.addMessage(fmt.Sprintf("jumped to chapter %d: %s", n, chapters[n-1].Title))
 			} else {
-				m.addMessage(fmt.Sprintf("invalid chapter: %d (1-%d)", n, len(chapters)))
 			}
 		}
 		return m, nil
@@ -429,7 +411,6 @@ func (m model) confirmMenuSelection() (tea.Model, tea.Cmd) {
 					}}
 					return m, nil
 				}
-				m.addMessage(fmt.Sprintf("loaded: %s", filepath.Base(path)))
 			}
 		}
 	case menuTheme:
@@ -444,16 +425,13 @@ func (m model) confirmMenuSelection() (tea.Model, tea.Cmd) {
 					}
 					m.pager.SetThemeLines(usable)
 				}
-				m.addMessage(fmt.Sprintf("switched to theme: %s", t.Name()))
 				break
 			}
 		}
 	case menuChapter:
 		ch, _ := strconv.Atoi(item.value)
 		if m.pager != nil {
-			title := m.pager.Chapters()[ch].Title
 			m.pager.GoToChapter(ch)
-			m.addMessage(fmt.Sprintf("jumped to: %s", title))
 			m.saveHistory()
 		}
 	case menuResume:
@@ -464,11 +442,9 @@ func (m model) confirmMenuSelection() (tea.Model, tea.Cmd) {
 				for i := 0; i < pos.Page && i < m.pager.TotalPages(); i++ {
 					m.pager.NextPage()
 				}
-				m.addMessage("resumed from last position")
-			}
+					}
 		case "start":
-			m.addMessage("started from beginning")
-		case "jump":
+			case "jump":
 			m.menu = menuState{}
 			return m.cmdChapters("")
 		}
@@ -565,15 +541,17 @@ func (m model) View() string {
 		}, m.width, m.height)
 	}
 
-	// 2. Message area (command output between content and input)
-	msgView := m.renderMessages()
-
 	popupView := m.renderPopup()
 
-	output := content + msgView + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width) + "\n" + popupView
+	output := content + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width) + "\n" + popupView
 
-	// Pad every line to full terminal width and ensure output fills the screen
-	return padViewOutput(output, m.width, m.height)
+	// Pad output to fill terminal height so old content doesn't bleed through
+	lines := strings.Count(output, "\n")
+	if lines < m.height {
+		output += strings.Repeat("\n", m.height-lines)
+	}
+
+	return output
 }
 
 func (m model) renderReadingContent() string {
@@ -602,19 +580,6 @@ func (m model) renderReadingContent() string {
 		ThemeName:     m.theme.Name(),
 		Version:       m.version,
 	}, m.width, m.height)
-}
-
-func (m model) renderMessages() string {
-	if len(m.messages) == 0 {
-		return ""
-	}
-	grayStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6b7280"))
-	var b strings.Builder
-	for _, msg := range m.messages {
-		b.WriteString(grayStyle.Render("  " + msg))
-		b.WriteString("\n")
-	}
-	return b.String()
 }
 
 func (m model) renderPopup() string {
@@ -712,86 +677,4 @@ func renderSeparator(width int) string {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#4b5563")).
 		Render(strings.Repeat("─", width))
-}
-
-// padViewOutput ensures every line is exactly `width` visible chars
-// and the total output has exactly `height` lines.
-func padViewOutput(output string, width, height int) string {
-	lines := strings.Split(output, "\n")
-
-	// Remove trailing empty from final newline
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
-	}
-
-	// Pad/truncate each line to exact visible width
-	for i, line := range lines {
-		visW := lipgloss.Width(line)
-		if visW < width {
-			lines[i] = line + strings.Repeat(" ", width-visW)
-		} else if visW > width {
-			// Truncate by stripping visible characters
-			lines[i] = truncateVisible(line, width)
-		}
-	}
-
-	// Pad to exact terminal height
-	for len(lines) < height {
-		lines = append(lines, strings.Repeat(" ", width))
-	}
-	if len(lines) > height {
-		lines = lines[:height]
-	}
-
-	return strings.Join(lines, "\n")
-}
-
-func charWidth(r rune) int {
-	if r >= 0x1100 && (r <= 0x115F || r == 0x2329 || r == 0x232A ||
-		(r >= 0x2E80 && r <= 0xA4CF && r != 0x303F) ||
-		(r >= 0xAC00 && r <= 0xD7A3) ||
-		(r >= 0xF900 && r <= 0xFAFF) ||
-		(r >= 0xFE10 && r <= 0xFE19) ||
-		(r >= 0xFE30 && r <= 0xFE6F) ||
-		(r >= 0xFF01 && r <= 0xFF60) ||
-		(r >= 0xFFE0 && r <= 0xFFE6) ||
-		(r >= 0x20000 && r <= 0x2FFFD) ||
-		(r >= 0x30000 && r <= 0x3FFFD)) {
-		return 2
-	}
-	return 1
-}
-
-func truncateVisible(line string, targetWidth int) string {
-	var b strings.Builder
-	inEscape := false
-	currentWidth := 0
-
-	for i := 0; i < len(line); i++ {
-		ch := line[i]
-		if ch == '\033' {
-			inEscape = true
-			b.WriteByte(ch)
-			continue
-		}
-		if inEscape {
-			b.WriteByte(ch)
-			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
-				inEscape = false
-			}
-			continue
-		}
-		r, size := utf8.DecodeRuneInString(line[i:])
-		rw := charWidth(r)
-		if currentWidth+rw > targetWidth {
-			break
-		}
-		b.WriteString(line[i : i+size])
-		currentWidth += rw
-		i += size - 1
-	}
-	if w := lipgloss.Width(b.String()); w < targetWidth {
-		b.WriteString(strings.Repeat(" ", targetWidth-w))
-	}
-	return b.String()
 }
