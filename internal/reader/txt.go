@@ -1,8 +1,14 @@
 package reader
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
+
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
 type TXTReader struct {
@@ -19,8 +25,21 @@ func (r *TXTReader) Load(path string) error {
 	if err != nil {
 		return err
 	}
-	r.parse(string(data))
+	content := decodeBytes(data)
+	r.parse(content)
 	return nil
+}
+
+func decodeBytes(data []byte) string {
+	if utf8.Valid(data) {
+		return string(data)
+	}
+	rd := transform.NewReader(bytes.NewReader(data), simplifiedchinese.GBK.NewDecoder())
+	decoded, err := io.ReadAll(rd)
+	if err != nil {
+		return string(data)
+	}
+	return string(decoded)
 }
 
 func (r *TXTReader) parse(content string) {

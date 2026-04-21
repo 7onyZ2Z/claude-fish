@@ -59,7 +59,6 @@ var allCommands = []command{
 	{"/chapters", "Jump to chapter"},
 	{"/back", "Previous page"},
 	{"/next", "Next page"},
-	{"/help", "Show available commands"},
 }
 
 // ── Model ────────────────────────────────────────────────────────
@@ -167,8 +166,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key == "tab" {
 			return m.handleTab()
 		}
-		// Esc: in boss mode go back, otherwise quit
+		// Esc: close autocomplete if showing, otherwise boss back or quit
 		if key == "esc" {
+			input := m.input.Value()
+			if strings.HasPrefix(input, "/") && len(filterCommands(input)) > 0 {
+				m.input.SetValue("")
+				m.menu = menuState{}
+				return m, nil
+			}
 			if m.state == stateBoss {
 				m.state = stateReading
 				m.boss.Deactivate()
@@ -526,10 +531,9 @@ func (m model) View() string {
 	// 2. Message area (command output between content and input)
 	msgView := m.renderMessages()
 
-	// 3. Autocomplete popup or submenu
 	popupView := m.renderPopup()
 
-	return content + msgView + popupView + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width)
+	return content + msgView + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width) + "\n" + popupView
 }
 
 func (m model) renderReadingContent() string {

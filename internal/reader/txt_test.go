@@ -51,6 +51,25 @@ func TestTXTReaderInvalidPath(t *testing.T) {
 	}
 }
 
+func TestTXTReaderGBK(t *testing.T) {
+	r := &TXTReader{}
+	path := filepath.Join("..", "..", "testdata", "sample_gbk.txt")
+	if err := r.Load(path); err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	chapters := r.Chapters()
+	if len(chapters) != 2 {
+		t.Fatalf("expected 2 chapters, got %d", len(chapters))
+	}
+	if chapters[0].Title != "第一章 开始" {
+		t.Errorf("chapter 0 title = %q, want %q", chapters[0].Title, "第一章 开始")
+	}
+	content := r.ReadPage(0, 0, 80, 10)
+	if content == "" {
+		t.Error("ReadPage returned empty for GBK file")
+	}
+}
+
 func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
