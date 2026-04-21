@@ -44,36 +44,25 @@ func decodeBytes(data []byte) string {
 
 func (r *TXTReader) parse(content string) {
 	r.chapters = nil
-	paragraphs := strings.Split(content, "\n\n")
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	content = strings.ReplaceAll(content, "\r", "\n")
+	lines := strings.Split(content, "\n")
+
 	var current *txtChapter
 
-	for _, p := range paragraphs {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			continue
-		}
-		lines := strings.Split(p, "\n")
-		first := strings.TrimSpace(lines[0])
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
 
-		if isChapterHeading(first) {
+		if isChapterHeading(line) {
 			if current != nil {
 				r.chapters = append(r.chapters, *current)
 			}
-			current = &txtChapter{title: first}
-			for _, l := range lines[1:] {
-				if l = strings.TrimSpace(l); l != "" {
-					current.lines = append(current.lines, l)
-				}
-			}
-		} else {
+			current = &txtChapter{title: line}
+		} else if line != "" {
 			if current == nil {
 				current = &txtChapter{title: "序章"}
 			}
-			for _, l := range lines {
-				if l = strings.TrimSpace(l); l != "" {
-					current.lines = append(current.lines, l)
-				}
-			}
+			current.lines = append(current.lines, line)
 		}
 	}
 	if current != nil {
@@ -82,13 +71,78 @@ func (r *TXTReader) parse(content string) {
 }
 
 func isChapterHeading(line string) bool {
-	prefixes := []string{"第", "Chapter", "chapter", "CHAPTER"}
-	for _, p := range prefixes {
-		if strings.HasPrefix(line, p) {
+	if len(line) == 0 || len(line) > 80 {
+		return false
+	}
+
+	// Skip lines that look like body text (contain common punctuation mid-line)
+	if strings.Contains(line, "，") || strings.Contains(line, "。") ||
+		strings.Contains(line, "！") || strings.Contains(line, "？") ||
+		strings.Contains(line, "、") || strings.Contains(line, "；") ||
+		strings.Contains(line, "：") {
+		return false
+	}
+
+	// 第X章/节/回/卷/部/篇 ...
+	if isChineseChapterHeading(line) {
+		return true
+	}
+
+	// Chapter/CHAPTER/chapter N
+	lower := strings.ToLower(line)
+	if strings.HasPrefix(lower, "chapter ") {
+		return true
+	}
+
+	// 分节阅读 N
+	if strings.HasPrefix(line, "分节阅读 ") {
+		return true
+	}
+
+	return false
+}
+
+func isChineseChapterHeading(line string) bool {
+	if !strings.HasPrefix(line, "第") {
+		return false
+	}
+	rest := line[3:] // skip "第" (UTF-8: 3 bytes)
+
+	// Consume Chinese or Arabic digits
+	hasDigit := false
+	for _, r := range rest {
+		if isChineseDigit(r) || (r >= '0' && r <= '9') {
+			hasDigit = true
+			continue
+		}
+		break
+	}
+	if !hasDigit {
+		return false
+	}
+
+	// Check for chapter-type suffix after digits
+	// Find position after digits
+	runes := []rune(rest)
+	pos := 0
+	for pos < len(runes) && (isChineseDigit(runes[pos]) || (runes[pos] >= '0' && runes[pos] <= '9')) {
+		pos++
+	}
+	if pos >= len(runes) {
+		return false
+	}
+
+	suffixes := []rune{'章', '节', '回', '卷', '部', '篇', '集'}
+	for _, s := range suffixes {
+		if runes[pos] == s {
 			return true
 		}
 	}
 	return false
+}
+
+func isChineseDigit(r rune) bool {
+	return strings.ContainsRune("零一二三四五六七八九十百千万亿〇壹贰叁肆伍陆柒捌玖拾佰仟", r)
 }
 
 func (r *TXTReader) Chapters() []Chapter {

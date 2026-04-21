@@ -33,6 +33,7 @@ const (
 	menuNovel
 	menuTheme
 	menuChapter
+	menuResume
 )
 
 type menuItem struct {
@@ -79,6 +80,8 @@ type model struct {
 	menu       menuState
 	novelDir   string
 	messages   []string // command output lines shown between content and input
+	history    *HistoryStore
+	resumePath string // pending novel path awaiting resume choice
 }
 
 func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, speed int) model {
@@ -123,6 +126,7 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 		version:    "v1.0.0",
 		input:      ti,
 		novelDir:   "novel",
+		history:    LoadHistory(),
 	}
 }
 
@@ -192,6 +196,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.TrimSpace(m.input.Value()) == "" {
 				if m.state == stateReading && m.pager != nil {
 					m.pager.NextPage()
+					m.saveHistory()
 				}
 				return m, nil
 			}
@@ -416,6 +421,20 @@ func (m model) confirmMenuSelection() (tea.Model, tea.Cmd) {
 				}
 				m.pager = NewPager(r, m.width-4, usable)
 				m.fileName = filepath.Base(path)
+				m.resumePath = path
+
+				if pos, ok := m.history.Get(path); ok {
+					chTitle := "(unknown chapter)"
+					if pos.Chapter < len(m.pager.Chapters()) {
+						chTitle = m.pager.Chapters()[pos.Chapter].Title
+					}
+					m.menu = menuState{kind: menuResume, selected: 0, items: []menuItem{
+						{label: fmt.Sprintf("Resume: %s (page %d)", chTitle, pos.Page+1), value: "resume"},
+						{label: "Start from beginning", value: "start"},
+						{label: "Jump to chapter...", value: "jump"},
+					}}
+					return m, nil
+				}
 				m.addMessage(fmt.Sprintf("loaded: %s", filepath.Base(path)))
 			}
 		}
@@ -441,11 +460,36 @@ func (m model) confirmMenuSelection() (tea.Model, tea.Cmd) {
 			title := m.pager.Chapters()[ch].Title
 			m.pager.GoToChapter(ch)
 			m.addMessage(fmt.Sprintf("jumped to: %s", title))
+			m.saveHistory()
 		}
+	case menuResume:
+		switch item.value {
+		case "resume":
+			if pos, ok := m.history.Get(m.resumePath); ok && m.pager != nil {
+				m.pager.GoToChapter(pos.Chapter)
+				for i := 0; i < pos.Page && i < m.pager.TotalPages(); i++ {
+					m.pager.NextPage()
+				}
+				m.addMessage("resumed from last position")
+			}
+		case "start":
+			m.addMessage("started from beginning")
+		case "jump":
+			m.menu = menuState{}
+			return m.cmdChapters("")
+		}
+		m.resumePath = ""
 	}
 
 	m.menu = menuState{}
+	m.saveHistory()
 	return m, nil
+}
+
+func (m *model) saveHistory() {
+	if m.pager != nil && m.fileName != "" && m.history != nil {
+		m.history.Save(filepath.Join(m.novelDir, m.fileName), m.pager.Chapter(), m.pager.Page())
+	}
 }
 
 // ── Command autocomplete ─────────────────────────────────────────
@@ -622,7 +666,7 @@ func (m model) renderMenu() string {
 
 	var b strings.Builder
 
-	titles := map[menuKind]string{menuNovel: "Novels", menuTheme: "Themes", menuChapter: "Chapters"}
+	titles := map[menuKind]string{menuNovel: "Novels", menuTheme: "Themes", menuChapter: "Chapters", menuResume: "Resume Reading"}
 	accentColor := m.theme.AccentColor()
 	titleStyle := lipgloss.NewStyle().Foreground(accentColor).Bold(true)
 	grayStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6b7280"))
