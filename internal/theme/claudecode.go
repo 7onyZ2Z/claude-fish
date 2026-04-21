@@ -28,6 +28,15 @@ func (claudeCodeTheme) Name() string                { return "claude" }
 func (claudeCodeTheme) AccentColor() lipgloss.Color { return claudePurple }
 func (claudeCodeTheme) UsableHeight(h int) int      { return h - 8 }
 
+// padRight pads a string to target visible width (accounts for ANSI escape codes).
+func padRight(s string, targetWidth int) string {
+	visWidth := lipgloss.Width(s)
+	if visWidth >= targetWidth {
+		return s
+	}
+	return s + strings.Repeat(" ", targetWidth-visWidth)
+}
+
 // renderClaudeHeader renders a realistic Claude Code header for disguise.
 func renderClaudeHeader(version, fileName, themeName string, totalChapters int, width int) string {
 	var b strings.Builder
@@ -38,12 +47,15 @@ func renderClaudeHeader(version, fileName, themeName string, totalChapters int, 
 	grayStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(claudeGray))
 
 	// Top border
-	topText := fmt.Sprintf("─── Claude Code %s ", version)
-	padLen := width - 2 - len(topText)
+	topText := fmt.Sprintf(" Claude Code %s ", version)
+	topVisibleW := lipgloss.Width(topText)
+	rightText := " Tips for getting started "
+	rightVisibleW := lipgloss.Width(rightText)
+	padLen := width - 2 - topVisibleW - rightVisibleW
 	if padLen < 1 {
 		padLen = 1
 	}
-	b.WriteString(borderStyle.Render("╭" + topText + strings.Repeat("─", padLen) + "╮"))
+	b.WriteString(borderStyle.Render("╭" + topText + rightText + strings.Repeat("─", padLen) + "╮"))
 	b.WriteString("\n")
 
 	// Working directory
@@ -53,7 +65,6 @@ func renderClaudeHeader(version, fileName, themeName string, totalChapters int, 
 		shortDir = "~/" + shortDir
 	}
 
-	// Row builder helper
 	innerW := width - 2
 	leftColW := innerW / 2
 
@@ -62,17 +73,17 @@ func renderClaudeHeader(version, fileName, themeName string, totalChapters int, 
 		{"", ""},
 		{"                  Welcome back!", ""},
 		{"", "Run /init to create a CLAUDE.md file with instructions for Claude"},
-		{"                      " + orangeStyle.Render("▐▛███▜▌"), " ───────────────────────────────────────────────────────────────"},
+		{"                      " + orangeStyle.Render("▐▛███▜▌"), " ─────────────────────────────────────────────────────────────"},
 		{"                     " + orangeStyle.Render("▝▜█████▛▘"), " Recent activity"},
 		{"                       " + orangeStyle.Render("▘▘ ▝▝"), " No recent activity"},
 		{"", ""},
-		{"   " + accentStyle.Render("GLM-5 with medium effort · API Usage Billing"), ""},
+		{"   " + accentStyle.Render("Claude Opus 4.6 with medium effort · API Usage Billing"), ""},
 		{"                " + grayStyle.Render(shortDir), ""},
 	}
 
 	for _, r := range rows {
-		leftPadded := fmt.Sprintf("%-*s", leftColW, r.left)
-		rightPadded := fmt.Sprintf("%-*s", innerW-leftColW, r.right)
+		leftPadded := padRight(r.left, leftColW)
+		rightPadded := padRight(r.right, innerW-leftColW)
 		b.WriteString(borderStyle.Render("│") + leftPadded + rightPadded + borderStyle.Render("│"))
 		b.WriteString("\n")
 	}

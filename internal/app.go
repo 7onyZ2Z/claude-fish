@@ -178,11 +178,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.menu = menuState{}
 				return m, nil
 			}
-			if m.state == stateBoss {
-				m.state = stateReading
-				m.boss.Deactivate()
-				return m, nil
-			}
 			return m, tea.Quit
 		}
 
