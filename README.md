@@ -58,11 +58,17 @@ cd claude-fish
 go build -o claude-fish .
 ```
 
-## 使用方法
+### 使用方法
 
-```bash
-./claude-fish
+* macOS / Linux: 解压后 一行命令运行
+
 ```
+./claude-fish 
+```
+
+
+
+* Windows: 解压后双击 **start.bat** 一键运行，或在终端执行 **claude-fish.exe**
 
 启动后进入 Claude Code 风格界面，输入 `/novel` 选择小说文件开始阅读。
 
