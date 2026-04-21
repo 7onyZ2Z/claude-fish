@@ -2,6 +2,8 @@ package theme
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -26,63 +28,51 @@ func (claudeCodeTheme) Name() string                { return "claude" }
 func (claudeCodeTheme) AccentColor() lipgloss.Color { return claudePurple }
 func (claudeCodeTheme) UsableHeight(h int) int      { return h - 8 }
 
-// renderClaudeHeader renders the shared header bar with branding, file info, and tips.
+// renderClaudeHeader renders a realistic Claude Code header for disguise.
 func renderClaudeHeader(version, fileName, themeName string, totalChapters int, width int) string {
 	var b strings.Builder
 
 	borderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(claudePurple))
-
-	// Top border with branding
-	topInner := fmt.Sprintf(" claude-fish %s ", version)
-	rightInfo := fmt.Sprintf(" %s · %d ch ", fileName, totalChapters)
-	padLen := width - 2 - len(topInner) - len(rightInfo)
-	if padLen < 1 {
-		padLen = 1
-	}
-	b.WriteString(borderStyle.Render("╭" + strings.Repeat("─", 1+len(topInner)) + " " + rightInfo + strings.Repeat("─", padLen) + "╮"))
-	b.WriteString("\n")
-
-	// Content row: logo left, tips right
 	orangeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(claudeOrange))
 	accentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(claudeLightPurple))
 	grayStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(claudeGray))
 
-	logoLines := []string{
-		fmt.Sprintf("│  %s  claude-fish %s", accentStyle.Render("●"), version),
-		fmt.Sprintf("│          %s", orangeStyle.Render("▐▛███▜▌")),
-		fmt.Sprintf("│         %s", orangeStyle.Render("▝▜█████▛▘")),
-		fmt.Sprintf("│           %s", orangeStyle.Render("▘▘ ▝▝")),
-		fmt.Sprintf("│  %s · %s", accentStyle.Render(themeName), grayStyle.Render(fileName)),
+	// Top border
+	topText := fmt.Sprintf("─── Claude Code %s ", version)
+	padLen := width - 2 - len(topText)
+	if padLen < 1 {
+		padLen = 1
+	}
+	b.WriteString(borderStyle.Render("╭" + topText + strings.Repeat("─", padLen) + "╮"))
+	b.WriteString("\n")
+
+	// Working directory
+	cwd, _ := os.Getwd()
+	shortDir := filepath.Base(cwd)
+	if cwd != "" {
+		shortDir = "~/" + shortDir
 	}
 
-	tipsLines := []string{
-		grayStyle.Render("Tips for getting started"),
-		grayStyle.Render(fmt.Sprintf("Loaded %s (%d chapters)", fileName, totalChapters)),
-		grayStyle.Render("Space: next page | B: back"),
-		grayStyle.Render("S: switch style | Tab: boss key"),
-		grayStyle.Render("Q: quit"),
+	// Row builder helper
+	innerW := width - 2
+	leftColW := innerW / 2
+
+	type row struct{ left, right string }
+	rows := []row{
+		{"", ""},
+		{"                  Welcome back!", ""},
+		{"", "Run /init to create a CLAUDE.md file with instructions for Claude"},
+		{"                      " + orangeStyle.Render("▐▛███▜▌"), " ───────────────────────────────────────────────────────────────"},
+		{"                     " + orangeStyle.Render("▝▜█████▛▘"), " Recent activity"},
+		{"                       " + orangeStyle.Render("▘▘ ▝▝"), " No recent activity"},
+		{"", ""},
+		{"   " + accentStyle.Render("GLM-5 with medium effort · API Usage Billing"), ""},
+		{"                " + grayStyle.Render(shortDir), ""},
 	}
 
-	maxLines := len(logoLines)
-	if len(tipsLines) > maxLines {
-		maxLines = len(tipsLines)
-	}
-
-	for i := 0; i < maxLines; i++ {
-		var left, right string
-		if i < len(logoLines) {
-			left = logoLines[i]
-		}
-		if i < len(tipsLines) {
-			right = tipsLines[i]
-		}
-		// Pad left to 44 chars, right fills the rest
-		leftPadded := fmt.Sprintf("%-44s", left)
-		rightPad := width - 2 - 44
-		if rightPad < 1 {
-			rightPad = 1
-		}
-		rightPadded := fmt.Sprintf("%-*s", rightPad, right)
+	for _, r := range rows {
+		leftPadded := fmt.Sprintf("%-*s", leftColW, r.left)
+		rightPadded := fmt.Sprintf("%-*s", innerW-leftColW, r.right)
 		b.WriteString(borderStyle.Render("│") + leftPadded + rightPadded + borderStyle.Render("│"))
 		b.WriteString("\n")
 	}

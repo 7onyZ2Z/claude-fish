@@ -123,7 +123,7 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 		width:      width,
 		height:     height,
 		speed:      speed,
-		version:    "v1.0.0",
+		version:    "v2.1.116",
 		input:      ti,
 		novelDir:   "novel",
 		history:    LoadHistory(),

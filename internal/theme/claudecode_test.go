@@ -22,10 +22,16 @@ func TestClaudeCodeRenderPage(t *testing.T) {
 		FileName:      "三体.txt",
 		TotalChapters: 42,
 		ThemeName:     "claude",
-		Version:       "v1.0.0",
+		Version:       "v2.1.116",
 	}
 	output := th.RenderPage(info, 80, 24)
 
+	if !strings.Contains(output, "Claude Code") {
+		t.Error("RenderPage output missing Claude Code branding")
+	}
+	if !strings.Contains(output, "Welcome back") {
+		t.Error("RenderPage output missing Welcome back")
+	}
 	if !strings.Contains(output, "第一章 开始") {
 		t.Error("RenderPage output missing chapter title")
 	}
@@ -34,12 +40,6 @@ func TestClaudeCodeRenderPage(t *testing.T) {
 	}
 	if !strings.Contains(output, "2/10") {
 		t.Error("RenderPage output missing page indicator 2/10")
-	}
-	if !strings.Contains(output, "三体.txt") {
-		t.Error("RenderPage output missing filename in header")
-	}
-	if !strings.Contains(output, "42") {
-		t.Error("RenderPage output missing chapter count in header")
 	}
 }
 
@@ -51,12 +51,15 @@ func TestClaudeCodeRenderCode(t *testing.T) {
 		Displayed: 30,
 		Total:     60,
 		ThemeName: "claude",
-		Version:   "v1.0.0",
+		Version:   "v2.1.116",
 	}
 	output := th.RenderCode(info, 80, 24)
 
 	if !strings.Contains(output, "main.go") {
 		t.Error("RenderCode output missing filename")
+	}
+	if !strings.Contains(output, "Claude Code") {
+		t.Error("RenderCode output missing Claude Code branding")
 	}
 }
 
