@@ -14,8 +14,7 @@ import (
 type appState int
 
 const (
-	stateWelcome appState = iota
-	stateReading
+	stateReading appState = iota
 	stateBoss
 )
 
@@ -30,6 +29,7 @@ type model struct {
 	height     int
 	speed      int
 	fileName   string
+	version    string
 }
 
 // newModel creates the internal model. Used by NewApp and tests.
@@ -57,7 +57,7 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 	}
 
 	return model{
-		state:      stateWelcome,
+		state:      stateReading,
 		theme:      th,
 		themes:     themes,
 		themeIndex: themeIndex,
@@ -66,6 +66,7 @@ func newModel(r reader.Reader, th theme.Theme, boss *BossMode, width, height, sp
 		width:      width,
 		height:     height,
 		speed:      speed,
+		version:    "v1.0.0",
 	}
 }
 
@@ -114,14 +115,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) handleKey(key string) (tea.Model, tea.Cmd) {
 	switch m.state {
-	case stateWelcome:
-		switch key {
-		case " ", "enter":
-			m.state = stateReading
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		}
-
 	case stateReading:
 		switch key {
 		case " ", "right", "l":
@@ -170,36 +163,29 @@ func (m model) handleKey(key string) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	switch m.state {
-	case stateWelcome:
-		chapters := 0
-		if m.pager != nil {
-			chapters = len(m.pager.Chapters())
-		}
-		return m.theme.RenderWelcome(theme.WelcomeInfo{
-			Version:   "v1.0.0",
-			FileName:  m.fileName,
-			Chapters:  chapters,
-			ThemeName: m.theme.Name(),
-		}) + "\n" + renderSeparator(m.width) + "\n" + prompt() + "\n" + renderSeparator(m.width)
-
 	case stateReading:
 		title := ""
 		content := ""
 		pageNum := 0
 		totalPages := 0
+		totalChapters := 0
 		if m.pager != nil {
 			title = m.pager.CurrentTitle()
 			content = m.pager.CurrentContent()
 			pageNum = m.pager.Page()
 			totalPages = m.pager.TotalPages()
+			totalChapters = len(m.pager.Chapters())
 		}
 		return m.theme.RenderPage(theme.PageInfo{
-			ChapterTitle: title,
-			Content:      content,
-			PageNum:      pageNum,
-			TotalPages:   totalPages,
-			FileName:     m.fileName,
-		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n" + prompt() + "\n" + renderSeparator(m.width)
+			ChapterTitle:  title,
+			Content:       content,
+			PageNum:       pageNum,
+			TotalPages:    totalPages,
+			FileName:      m.fileName,
+			TotalChapters: totalChapters,
+			ThemeName:     m.theme.Name(),
+			Version:       m.version,
+		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n❯ \n" + renderSeparator(m.width)
 
 	case stateBoss:
 		s := m.boss.Streamer()
@@ -210,14 +196,12 @@ func (m model) View() string {
 			Content:   highlighted,
 			Displayed: s.Displayed(),
 			Total:     s.Total(),
+			ThemeName: m.theme.Name(),
+			Version:   m.version,
 		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n❯ \n" + renderSeparator(m.width)
 	}
 
 	return ""
-}
-
-func prompt() string {
-	return "❯ "
 }
 
 func renderSeparator(width int) string {

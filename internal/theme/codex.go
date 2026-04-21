@@ -19,28 +19,32 @@ func NewCodex() Theme { return codexTheme{} }
 
 func (codexTheme) Name() string                { return "codex" }
 func (codexTheme) AccentColor() lipgloss.Color { return codexGreen }
-func (codexTheme) UsableHeight(h int) int      { return h - 6 }
+func (codexTheme) UsableHeight(h int) int      { return h - 5 }
 
-func (codexTheme) RenderWelcome(info WelcomeInfo) string {
+// renderCodexHeader renders the shared header for reading and editing views.
+func renderCodexHeader(version, fileName, themeName string, totalChapters int) string {
 	var b strings.Builder
 	green := lipgloss.NewStyle().Foreground(lipgloss.Color(codexGreen)).Bold(true)
 	gray := lipgloss.NewStyle().Foreground(lipgloss.Color(codexGray))
 
 	b.WriteString(green.Render("codex"))
 	b.WriteString(" ")
-	b.WriteString(gray.Render(info.Version))
+	b.WriteString(gray.Render(version))
+	b.WriteString(gray.Render(" │ "))
+	b.WriteString(gray.Render(fmt.Sprintf("%s (%d ch) │ %s", fileName, totalChapters, themeName)))
 	b.WriteString("\n")
 	b.WriteString(gray.Render(strings.Repeat("─", 60)))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("Loaded: %s (%d chapters)\n", info.FileName, info.Chapters))
-	b.WriteString("\n")
-	b.WriteString(gray.Render("Press Space to start reading"))
-	b.WriteString("\n")
+
 	return b.String()
 }
 
 func (codexTheme) RenderPage(info PageInfo, width, _ int) string {
 	var b strings.Builder
+
+	// Shared header
+	b.WriteString(renderCodexHeader(info.Version, info.FileName, info.ThemeName, info.TotalChapters))
+
 	green := lipgloss.NewStyle().Foreground(lipgloss.Color(codexGreen))
 	white := lipgloss.NewStyle().Foreground(lipgloss.Color(codexWhite))
 	gray := lipgloss.NewStyle().Foreground(lipgloss.Color(codexGray))
@@ -65,6 +69,10 @@ func (codexTheme) RenderPage(info PageInfo, width, _ int) string {
 
 func (codexTheme) RenderCode(info CodeInfo, width, _ int) string {
 	var b strings.Builder
+
+	// Shared header
+	b.WriteString(renderCodexHeader(info.Version, info.FileName, info.ThemeName, 0))
+
 	green := lipgloss.NewStyle().Foreground(lipgloss.Color(codexGreen))
 	gray := lipgloss.NewStyle().Foreground(lipgloss.Color(codexGray))
 	white := lipgloss.NewStyle().Foreground(lipgloss.Color(codexWhite))
@@ -97,10 +105,8 @@ func (codexTheme) RenderCode(info CodeInfo, width, _ int) string {
 func (codexTheme) RenderStatusBar(info StatusInfo, width int) string {
 	var parts []string
 	switch info.Mode {
-	case "welcome":
-		parts = []string{"Space: start", "q: quit"}
 	case "reading":
-		parts = []string{"Space: next", "q: quit", "!: boss"}
+		parts = []string{"Space: next", "B: back", "S: style", "!: boss", "Q: quit"}
 	case "boss":
 		parts = []string{"Tab: back"}
 	}

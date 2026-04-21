@@ -21,47 +21,47 @@ func NewOpenCode() Theme { return opencodeTheme{} }
 
 func (opencodeTheme) Name() string                { return "opencode" }
 func (opencodeTheme) AccentColor() lipgloss.Color { return ocBlue }
-func (opencodeTheme) UsableHeight(h int) int      { return h - 7 }
+func (opencodeTheme) UsableHeight(h int) int      { return h - 6 }
 
-func (opencodeTheme) RenderWelcome(info WelcomeInfo) string {
+// renderOpencodeHeader renders the shared header with branding and info.
+func renderOpencodeHeader(version, fileName, themeName string, totalChapters int) string {
 	var b strings.Builder
 	blue := lipgloss.NewStyle().Foreground(lipgloss.Color(ocBlue)).Bold(true)
 	gray := lipgloss.NewStyle().Foreground(lipgloss.Color(ocSubtext))
 
-	b.WriteString(renderTabBar("Welcome", []string{"Welcome", "Files", "Config"}))
+	b.WriteString(blue.Render("opencode"))
+	b.WriteString(" ")
+	b.WriteString(gray.Render(version))
+	b.WriteString(gray.Render(" │ "))
+	b.WriteString(gray.Render(fmt.Sprintf("%s (%d ch) │ %s", fileName, totalChapters, themeName)))
+	b.WriteString("\n")
+	b.WriteString(gray.Render(strings.Repeat("─", 60)))
 	b.WriteString("\n")
 
-	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(ocOverlay)).
-		Width(60).
-		Padding(1)
-
-	content := blue.Render("opencode") + "\n\n" +
-		fmt.Sprintf("Loaded: %s (%d chapters)\n", info.FileName, info.Chapters) +
-		gray.Render("Press Space to start")
-	b.WriteString(box.Render(content))
-	b.WriteString("\n")
 	return b.String()
 }
 
 func (opencodeTheme) RenderPage(info PageInfo, width, _ int) string {
 	var b strings.Builder
 
+	// Shared header
+	b.WriteString(renderOpencodeHeader(info.Version, info.FileName, info.ThemeName, info.TotalChapters))
+
+	// Tab bar
 	b.WriteString(renderTabBar("Chat", []string{"Chat", "Files", "Diff"}))
 	b.WriteString("\n")
 
 	blue := lipgloss.NewStyle().Foreground(lipgloss.Color(ocBlue))
 	text := lipgloss.NewStyle().Foreground(lipgloss.Color(ocText))
+	gray := lipgloss.NewStyle().Foreground(lipgloss.Color(ocSubtext))
 
 	b.WriteString(blue.Render("assistant"))
 	b.WriteString("\n")
-	b.WriteString(text.Render("  " + info.ChapterTitle))
+	b.WriteString(text.Render("  "+info.ChapterTitle))
 	b.WriteString("\n\n")
 	b.WriteString(text.Render(info.Content))
 	b.WriteString("\n\n")
 
-	gray := lipgloss.NewStyle().Foreground(lipgloss.Color(ocSubtext))
 	b.WriteString(gray.Render(fmt.Sprintf("%d/%d pages", info.PageNum+1, info.TotalPages)))
 	b.WriteString("\n")
 
@@ -71,6 +71,10 @@ func (opencodeTheme) RenderPage(info PageInfo, width, _ int) string {
 func (opencodeTheme) RenderCode(info CodeInfo, width, _ int) string {
 	var b strings.Builder
 
+	// Shared header
+	b.WriteString(renderOpencodeHeader(info.Version, info.FileName, info.ThemeName, 0))
+
+	// Tab bar
 	b.WriteString(renderTabBar("Diff", []string{"Chat", "Files", "Diff"}))
 	b.WriteString("\n")
 
@@ -105,10 +109,8 @@ func (opencodeTheme) RenderStatusBar(info StatusInfo, width int) string {
 	red := lipgloss.NewStyle().Foreground(lipgloss.Color(ocRed))
 
 	switch info.Mode {
-	case "welcome":
-		return gray.Render("Space: start | q: quit")
 	case "reading":
-		return gray.Render("Space: next | B: back | S: style | ") + red.Render("Tab") + gray.Render(": boss")
+		return gray.Render("Space: next | B: back | S: style | ") + red.Render("Tab") + gray.Render(": boss | Q: quit")
 	case "boss":
 		return red.Render("[BOSS MODE] ") + gray.Render("Tab: back")
 	}

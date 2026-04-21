@@ -15,11 +15,14 @@ func TestCodexName(t *testing.T) {
 func TestCodexRenderPage(t *testing.T) {
 	th := NewCodex()
 	info := PageInfo{
-		ChapterTitle: "Chapter 1",
-		Content:      "Test content.",
-		PageNum:      0,
-		TotalPages:   5,
-		FileName:     "test.txt",
+		ChapterTitle:  "Chapter 1",
+		Content:       "Test content.",
+		PageNum:       0,
+		TotalPages:    5,
+		FileName:      "test.txt",
+		TotalChapters: 10,
+		ThemeName:     "codex",
+		Version:       "v1.0",
 	}
 	output := th.RenderPage(info, 80, 24)
 	if !strings.Contains(output, "Chapter 1") {
@@ -28,19 +31,20 @@ func TestCodexRenderPage(t *testing.T) {
 	if !strings.Contains(output, "Test content") {
 		t.Error("missing content")
 	}
-}
-
-func TestCodexRenderWelcome(t *testing.T) {
-	th := NewCodex()
-	output := th.RenderWelcome(WelcomeInfo{Version: "v1.0", FileName: "test.txt", Chapters: 5})
 	if !strings.Contains(output, "test.txt") {
-		t.Error("missing filename")
+		t.Error("missing filename in header")
 	}
 }
 
 func TestCodexRenderCode(t *testing.T) {
 	th := NewCodex()
-	output := th.RenderCode(CodeInfo{FileName: "main.go", Content: "package main\n", Displayed: 8}, 80, 24)
+	output := th.RenderCode(CodeInfo{
+		FileName:  "main.go",
+		Content:   "package main\n",
+		Displayed: 8,
+		ThemeName: "codex",
+		Version:   "v1.0",
+	}, 80, 24)
 	if !strings.Contains(output, "main.go") {
 		t.Error("missing filename")
 	}
