@@ -1,0 +1,5 @@
+# .gitignore
+claude-fish
+*.exe
+.superpowers/
+.DS_Store
