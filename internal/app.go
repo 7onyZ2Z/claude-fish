@@ -96,6 +96,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKey(msg.String())
+
+	case tickMsg:
+		if m.state == stateBoss && m.boss.HasCode() {
+			s := m.boss.Streamer()
+			if !s.Done() {
+				s.Advance(1)
+				return m, tea.Tick(time.Duration(s.JitterSpeed())*time.Millisecond,
+					func(t time.Time) tea.Msg { return tickMsg(t) })
+			}
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -192,12 +203,14 @@ func (m model) View() string {
 
 	case stateBoss:
 		s := m.boss.Streamer()
+		visible := s.VisibleContent()
+		highlighted := HighlightCode(visible, s.FileName())
 		return m.theme.RenderCode(theme.CodeInfo{
 			FileName:  s.FileName(),
-			Content:   s.VisibleContent(),
+			Content:   highlighted,
 			Displayed: s.Displayed(),
 			Total:     s.Total(),
-		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n" + prompt() + "\n" + renderSeparator(m.width)
+		}, m.width, m.height) + "\n" + renderSeparator(m.width) + "\n❯ \n" + renderSeparator(m.width)
 	}
 
 	return ""
