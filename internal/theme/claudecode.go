@@ -120,8 +120,7 @@ func (claudeCodeTheme) RenderPage(info PageInfo, width, height int) string {
 
 	// Chapter title
 	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(claudeLightPurple)).Bold(true)
-	b.WriteString("✦ ")
-	b.WriteString(titleStyle.Render(info.ChapterTitle))
+	b.WriteString(padRight("✦ "+titleStyle.Render(info.ChapterTitle), width))
 	b.WriteString("\n")
 
 	// Content bubble
@@ -138,8 +137,7 @@ func (claudeCodeTheme) RenderPage(info PageInfo, width, height int) string {
 	// Page indicator
 	toolStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(claudeGreen))
 	grayStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(claudeGray))
-	b.WriteString(toolStyle.Render("✔"))
-	b.WriteString(grayStyle.Render(fmt.Sprintf(" Page %d of %d", info.PageNum+1, info.TotalPages)))
+	b.WriteString(padRight(toolStyle.Render("✔")+grayStyle.Render(fmt.Sprintf(" Page %d of %d", info.PageNum+1, info.TotalPages)), width))
 	b.WriteString("\n")
 
 	return b.String()
@@ -153,12 +151,16 @@ func (claudeCodeTheme) RenderCode(info CodeInfo, width, height int) string {
 
 	// Content — already formatted with think/text/code segments by streamer
 	if info.Content != "" {
-		b.WriteString(info.Content)
-		if !strings.HasSuffix(info.Content, "\n") {
+		lines := strings.Split(info.Content, "\n")
+		for i, line := range lines {
+			if line == "" && i == len(lines)-1 {
+				continue
+			}
+			b.WriteString(padRight(line, width))
 			b.WriteString("\n")
 		}
 		if info.Displayed < info.Total {
-			b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(claudePurple)).Render("▌"))
+			b.WriteString(padRight(lipgloss.NewStyle().Foreground(lipgloss.Color(claudePurple)).Render("▌"), width))
 			b.WriteString("\n")
 		}
 	}
