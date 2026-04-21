@@ -3,3 +3,6 @@ claude-fish
 *.exe
 .superpowers/
 .DS_Store
+.claude/
+dist/
+docs/
