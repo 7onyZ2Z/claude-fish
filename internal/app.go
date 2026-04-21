@@ -545,10 +545,12 @@ func (m model) View() string {
 
 	output := content + renderSeparator(m.width) + "\n" + inputView + "\n" + renderSeparator(m.width) + "\n" + popupView
 
-	// Pad output to fill terminal height so old content doesn't bleed through
+	// Pad output to fill terminal so old content doesn't bleed through.
+	// Leave 1 line margin to prevent top border from scrolling off screen.
 	lines := strings.Count(output, "\n")
-	if lines < m.height {
-		output += strings.Repeat("\n", m.height-lines)
+	target := m.height - 1
+	if lines < target {
+		output += strings.Repeat("\n", target-lines)
 	}
 
 	return output
