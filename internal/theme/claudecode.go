@@ -26,7 +26,12 @@ func NewClaudeCode() Theme { return claudeCodeTheme{} }
 
 func (claudeCodeTheme) Name() string                { return "claude" }
 func (claudeCodeTheme) AccentColor() lipgloss.Color { return claudePurple }
-func (claudeCodeTheme) UsableHeight(h int) int      { return h - 8 }
+func (claudeCodeTheme) UsableHeight(h int) int {
+	// header: 11 lines, reading bar: 3, title: 1, page indicator: 1
+	// view overhead: separator + input + separator = 3
+	// total fixed: 19, leave 1 line margin
+	return h - 20
+}
 
 // padRight pads a string to target visible width (accounts for ANSI escape codes).
 func padRight(s string, targetWidth int) string {
