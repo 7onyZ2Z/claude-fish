@@ -14,8 +14,8 @@ func TestBossModeInit(t *testing.T) {
 
 func TestBossModeNoCode(t *testing.T) {
 	b := NewBossMode(nil, 25)
-	if b.HasCode() {
-		t.Error("HasCode() should be false when no segments")
+	if !b.HasCode() {
+		t.Error("HasCode() should be true — falls back to default content")
 	}
 }
 

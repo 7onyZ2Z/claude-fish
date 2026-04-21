@@ -7,9 +7,12 @@ type BossMode struct {
 }
 
 func NewBossMode(segments []Segment, speed int) *BossMode {
+	if len(segments) == 0 {
+		segments = defaultBossContent
+	}
 	return &BossMode{
 		streamer: NewStreamer(segments, speed),
-		hasCode:  len(segments) > 0,
+		hasCode:  true,
 	}
 }
 
