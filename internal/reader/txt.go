@@ -178,7 +178,12 @@ func (r *TXTReader) TotalPages(chapter, width, linesPerPage int) int {
 }
 
 func wrapLines(lines []string, width int) []string {
-	var result []string
+	// Estimate ~2 wrapped lines per source line for preallocation
+	estimated := len(lines) * 2
+	if estimated < 64 {
+		estimated = 64
+	}
+	result := make([]string, 0, estimated)
 	for _, line := range lines {
 		result = append(result, wrapLine(line, width)...)
 	}
@@ -190,22 +195,23 @@ func wrapLine(line string, width int) []string {
 		return []string{line}
 	}
 	var result []string
-	var current string
+	var b strings.Builder
 	currentWidth := 0
 
 	for _, r := range line {
 		charWidth := runeWidth(r)
-		if currentWidth+charWidth > width && current != "" {
-			result = append(result, current)
-			current = string(r)
+		if currentWidth+charWidth > width && b.Len() > 0 {
+			result = append(result, b.String())
+			b.Reset()
+			b.WriteRune(r)
 			currentWidth = charWidth
 		} else {
-			current += string(r)
+			b.WriteRune(r)
 			currentWidth += charWidth
 		}
 	}
-	if current != "" {
-		result = append(result, current)
+	if b.Len() > 0 {
+		result = append(result, b.String())
 	}
 	return result
 }

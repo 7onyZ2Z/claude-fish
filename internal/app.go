@@ -439,12 +439,10 @@ func (m model) confirmMenuSelection() (tea.Model, tea.Cmd) {
 		case "resume":
 			if pos, ok := m.history.Get(m.resumePath); ok && m.pager != nil {
 				m.pager.GoToChapter(pos.Chapter)
-				for i := 0; i < pos.Page && i < m.pager.TotalPages(); i++ {
-					m.pager.NextPage()
-				}
-					}
+				m.pager.SetPage(pos.Page)
+			}
 		case "start":
-			case "jump":
+		case "jump":
 			m.menu = menuState{}
 			return m.cmdChapters("")
 		}

@@ -12,7 +12,8 @@ type Pager struct {
 	currentCh    int
 	currentPg    int
 	chapters     []reader.Chapter
-	totalPages   []int
+	totalPages   []int // -1 = not yet computed
+	cacheValid   []bool
 }
 
 func NewPager(r reader.Reader, width, linesPerPage int) *Pager {
@@ -25,20 +26,21 @@ func NewPager(r reader.Reader, width, linesPerPage int) *Pager {
 		currentPg:    0,
 		chapters:     chapters,
 		totalPages:   make([]int, len(chapters)),
+		cacheValid:   make([]bool, len(chapters)),
 	}
-	p.recalcAll()
 	return p
 }
 
-func (p *Pager) recalcAll() {
-	for i := range p.chapters {
-		p.totalPages[i] = p.r.TotalPages(i, p.width, p.linesPerPage)
+func (p *Pager) getTotalPages(ch int) int {
+	if ch < 0 || ch >= len(p.chapters) {
+		return 0
 	}
-	if p.currentCh >= 0 && p.currentCh < len(p.totalPages) {
-		if p.currentPg >= p.totalPages[p.currentCh] && p.totalPages[p.currentCh] > 0 {
-			p.currentPg = p.totalPages[p.currentCh] - 1
-		}
+	if p.cacheValid[ch] {
+		return p.totalPages[ch]
 	}
+	p.totalPages[ch] = p.r.TotalPages(ch, p.width, p.linesPerPage)
+	p.cacheValid[ch] = true
+	return p.totalPages[ch]
 }
 
 func (p *Pager) Chapters() []reader.Chapter { return p.chapters }
@@ -46,10 +48,7 @@ func (p *Pager) Chapter() int               { return p.currentCh }
 func (p *Pager) Page() int                  { return p.currentPg }
 
 func (p *Pager) TotalPages() int {
-	if p.currentCh < 0 || p.currentCh >= len(p.totalPages) {
-		return 0
-	}
-	return p.totalPages[p.currentCh]
+	return p.getTotalPages(p.currentCh)
 }
 
 func (p *Pager) CurrentContent() string {
@@ -64,7 +63,8 @@ func (p *Pager) CurrentTitle() string {
 }
 
 func (p *Pager) NextPage() bool {
-	if p.currentPg < p.totalPages[p.currentCh]-1 {
+	total := p.getTotalPages(p.currentCh)
+	if p.currentPg < total-1 {
 		p.currentPg++
 		return true
 	}
@@ -83,7 +83,8 @@ func (p *Pager) PrevPage() bool {
 	}
 	if p.currentCh > 0 {
 		p.currentCh--
-		p.currentPg = p.totalPages[p.currentCh] - 1
+		total := p.getTotalPages(p.currentCh)
+		p.currentPg = total - 1
 		if p.currentPg < 0 {
 			p.currentPg = 0
 		}
@@ -95,18 +96,29 @@ func (p *Pager) PrevPage() bool {
 func (p *Pager) Resize(width, linesPerPage int) {
 	p.width = width
 	p.linesPerPage = linesPerPage
-	p.recalcAll()
+	for i := range p.cacheValid {
+		p.cacheValid[i] = false
+	}
 }
 
 func (p *Pager) SetThemeLines(linesPerPage int) {
 	p.linesPerPage = linesPerPage
-	p.recalcAll()
+	for i := range p.cacheValid {
+		p.cacheValid[i] = false
+	}
 }
 
 func (p *Pager) GoToChapter(ch int) {
 	if ch >= 0 && ch < len(p.chapters) {
 		p.currentCh = ch
 		p.currentPg = 0
+	}
+}
+
+func (p *Pager) SetPage(pg int) {
+	total := p.getTotalPages(p.currentCh)
+	if pg >= 0 && pg < total {
+		p.currentPg = pg
 	}
 }
 
