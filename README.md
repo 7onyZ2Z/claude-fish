@@ -7,7 +7,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go" alt="Go">
-  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/License-ACNL%201.0-orange" alt="License">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue" alt="Platform">
 </p>
 
@@ -226,4 +226,24 @@ bash build.sh
 
 ## License
 
-MIT
+本项目使用自定义许可证：**ACNL v1.0**（见 [LICENSE](LICENSE)）。
+
+> 注意：该许可证为自定义许可证，**不是 OSI 标准开源许可证**。
+
+你可以做什么：
+
+- 使用本项目代码（个人或组织均可）
+- 修改代码并创建衍生版本
+- 重新分发原版或修改版
+
+你必须遵守：
+
+- 必须保留原作者署名（Tony）和许可证文本
+- 如果分发了修改版，必须明确标注你做过修改
+- 如果要商用，必须事先告知作者（说明产品/场景/联系方式）
+
+你不能做什么：
+
+- 删除或隐藏原作者署名后再发布
+- 未告知作者就直接进行商业化使用
+- 以任何方式暗示原作者对你的修改版提供担保
